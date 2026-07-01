@@ -333,6 +333,55 @@ function extractChildTagValues(xml) {
   return values;
 }
 
+// Convierte la respuesta XML (orientada a columnas) del servicio de datapreview de
+// ADT en un array de filas { NOMBRE_COLUMNA: valor }.
+function parseDataPreviewTable(xml) {
+  const columns = extractTagBlocks(xml, "columns").map((block) => {
+    const nameMatch = block.inner.match(/name="([^"]+)"/);
+    const name = nameMatch ? nameMatch[1] : "?";
+    const values = extractTagBlocks(block.inner, "data").map((d) => d.inner);
+    return { name, values };
+  });
+  const rowCount = columns.length ? Math.max(...columns.map((c) => c.values.length)) : 0;
+  const rows = [];
+  for (let i = 0; i < rowCount; i++) {
+    const row = {};
+    for (const col of columns) row[col.name] = col.values[i] ?? "";
+    rows.push(row);
+  }
+  return rows;
+}
+
+// Ejecuta una sentencia OpenSQL de solo lectura vía el servicio "SQL Console" de ADT
+// y devuelve las filas ya parseadas.
+async function runSqlQuery(conn, sql, rowNumber = 100) {
+  const { token: csrfToken, cookie } = await getCsrfToken(conn);
+  const res = await sapFetch(conn, `/sap/bc/adt/datapreview/freestyle?rowNumber=${rowNumber}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain",
+      "X-CSRF-Token": csrfToken,
+      Accept: "application/*",
+      ...(cookie ? { Cookie: cookie } : {}),
+    },
+    body: sql,
+  });
+  const xml = await res.text();
+  return parseDataPreviewTable(xml);
+}
+
+// El SID no viene en /sap/bc/adt/discovery (es solo un documento Atom de servicios,
+// sin ese dato). Se obtiene del LOGSYS de T000, que sigue el patrón "<SID>CLNT<mandante>".
+async function getSystemId(conn) {
+  try {
+    const rows = await runSqlQuery(conn, `SELECT LOGSYS FROM T000 WHERE MANDT = '${conn.client}'`, 1);
+    const logsys = rows[0]?.LOGSYS || "";
+    return logsys.replace(new RegExp(`CLNT${conn.client}$`), "") || "desconocido";
+  } catch {
+    return "desconocido";
+  }
+}
+
 // Reenvía a SAP la lista completa de breakpoints de la sesión (modo "full sync":
 // sustituye cualquier breakpoint anterior de este terminalId/ideId por esta lista,
 // así que para "borrar todos" basta con llamar con session.breakpoints = []).
@@ -764,14 +813,10 @@ server.tool(
   async (args) => {
     try {
       const conn = getConnection(args);
-      const res = await sapFetch(conn, "/sap/bc/adt/discovery", {
+      await sapFetch(conn, "/sap/bc/adt/discovery", {
         headers: { Accept: "application/atomsvc+xml" },
       });
-      const body = await res.text();
-
-      // Extrae el SID del XML de discovery
-      const sidMatch = body.match(/systemId="([^"]+)"/);
-      const sid = sidMatch?.[1] || "desconocido";
+      const sid = await getSystemId(conn);
 
       return {
         content: [{
@@ -784,6 +829,53 @@ server.tool(
         content: [{ type: "text", text: `❌ Error de conexión: ${err.message}` }],
         isError: true,
       };
+    }
+  }
+);
+
+// ─────────────────────────────────────────────
+// TOOL 7b: Especificaciones del sistema (release SAP/ABAP, componentes instalados)
+// ─────────────────────────────────────────────
+server.tool(
+  "get_system_specs",
+  "Obtiene las especificaciones del sistema SAP conectado: SID, mandante, y el release de SAP_BASIS/ABAP y demás componentes instalados (vía tabla CVERS). Útil para saber contra qué versión de ABAP/SAP se está desarrollando antes de generar código (p.ej. sintaxis nueva solo disponible desde cierto release).",
+  { ...connectionParams },
+  async (args) => {
+    try {
+      const conn = getConnection(args);
+      const sid = await getSystemId(conn);
+
+      const components = await runSqlQuery(
+        conn,
+        "SELECT COMPONENT,RELEASE,EXTRELEASE FROM CVERS",
+        100
+      );
+
+      const basis = components.find((c) => c.COMPONENT === "SAP_BASIS");
+
+      const lines = [
+        `🖥️  Host: ${conn.host}`,
+        `🏷️  Sistema (SID): ${sid}`,
+        `📦  Mandante: ${conn.client}`,
+        `👤  Usuario: ${conn.user}`,
+        "",
+      ];
+
+      if (basis) {
+        lines.push(`⚙️  Release SAP_BASIS (ABAP): ${basis.RELEASE} ${basis.EXTRELEASE || ""}`.trim());
+        lines.push("");
+      }
+
+      lines.push("Componentes instalados (tabla CVERS):");
+      lines.push(`${"COMPONENT".padEnd(20)} | ${"RELEASE".padEnd(10)} | EXTRELEASE`);
+      lines.push("-".repeat(50));
+      for (const c of components) {
+        lines.push(`${(c.COMPONENT || "").padEnd(20)} | ${(c.RELEASE || "").padEnd(10)} | ${c.EXTRELEASE || ""}`);
+      }
+
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };
     }
   }
 );
