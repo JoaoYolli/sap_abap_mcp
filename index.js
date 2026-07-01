@@ -6,26 +6,71 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { randomUUID } from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
 // ─────────────────────────────────────────────
-// CONEXIÓN — la proporciona quien llama a cada tool, no hay valores fijos
+// CONEXIÓN — las credenciales viven en un archivo local, nunca en la conversación
 // ─────────────────────────────────────────────
-// Parámetros de conexión compartidos por todas las tools. Se inyectan en
-// cada llamada (no hay host/usuario/contraseña hardcodeados en el servidor).
-const connectionParams = {
-  sap_host: z.string().describe("URL base del servidor SAP, ej: http://10.100.110.12:50000"),
-  sap_client: z.string().describe("Mandante (client) SAP, ej: 100"),
-  sap_user: z.string().describe("Usuario SAP"),
-  sap_password: z.string().describe("Contraseña del usuario SAP"),
+// Las tools ya no reciben host/usuario/contraseña como argumentos (eso obligaba a
+// pasar credenciales en texto plano por el chat/contexto del modelo). En su lugar
+// reciben un alias ("connection") que se resuelve aquí, en el propio servidor MCP,
+// contra un archivo de conexiones guardado fuera del repo.
+const CONFIG_DIR = path.join(os.homedir(), ".sap-mcp");
+const CONFIG_PATH = path.join(CONFIG_DIR, "connections.json");
+
+// Plantilla vacía que se escribe la primera vez que se usa el MCP en una máquina
+// nueva, para que quede claro qué campos hay que rellenar.
+const CONNECTIONS_TEMPLATE = {
+  dev: { host: "", client: "", user: "", password: "" },
 };
 
-// Extrae los datos de conexión de los argumentos de una tool
-function getConnection({ sap_host, sap_client, sap_user, sap_password }) {
+function loadConnectionsConfig() {
+  let raw;
+  try {
+    raw = fs.readFileSync(CONFIG_PATH, "utf-8");
+  } catch (err) {
+    // Solo se crea la plantilla si el archivo realmente no existe (ENOENT).
+    // Cualquier otro error (p.ej. permisos) se propaga tal cual: nunca hay que
+    // sobrescribir un archivo que podría existir pero no ser accesible.
+    if (err.code !== "ENOENT") throw err;
+
+    fs.mkdirSync(CONFIG_DIR, { recursive: true });
+    fs.writeFileSync(CONFIG_PATH, JSON.stringify(CONNECTIONS_TEMPLATE, null, 2), "utf-8");
+    try {
+      fs.chmodSync(CONFIG_PATH, 0o600);
+    } catch {
+      // chmod no tiene efecto real en Windows (no hay ACLs POSIX), se ignora.
+    }
+    throw new Error(
+      `No existía el archivo de conexiones: se ha creado una plantilla vacía en ${CONFIG_PATH}. ` +
+      `Rellena host/client/user/password (y añade tantos alias como conexiones necesites) y vuelve a intentarlo.`
+    );
+  }
+  return JSON.parse(raw);
+}
+
+const connectionParams = {
+  connection: z.string().describe(`Alias de la conexión SAP a usar, definida en ${CONFIG_PATH} (ej: dev, qas, prod). Usa la tool list_connections para ver los alias disponibles.`),
+};
+
+// Resuelve el alias de conexión contra el archivo de configuración local
+function getConnection({ connection }) {
+  const config = loadConnectionsConfig();
+  const entry = config[connection];
+  if (!entry) {
+    const available = Object.keys(config).join(", ") || "(ninguna configurada)";
+    throw new Error(`No existe la conexión "${connection}" en ${CONFIG_PATH}. Conexiones disponibles: ${available}`);
+  }
+  if (!entry.host) {
+    throw new Error(`La conexión "${connection}" está vacía en ${CONFIG_PATH}. Rellena host/client/user/password para poder usarla.`);
+  }
   return {
-    host: sap_host.replace(/\/+$/, ""),
-    client: sap_client,
-    user: sap_user,
-    password: sap_password,
+    host: entry.host.replace(/\/+$/, ""),
+    client: entry.client,
+    user: entry.user,
+    password: entry.password,
   };
 }
 
@@ -797,6 +842,31 @@ server.tool(
       return {
         content: [{ type: "text", text: output || `✅ Programa ${program_name} ejecutado (sin output de texto).` }],
       };
+    } catch (err) {
+      return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+// ─────────────────────────────────────────────
+// TOOL 6b: Listar conexiones SAP configuradas
+// ─────────────────────────────────────────────
+server.tool(
+  "list_connections",
+  `Lista los alias de conexión SAP disponibles (definidos en ${CONFIG_PATH}), sin exponer las contraseñas.`,
+  {},
+  async () => {
+    try {
+      const config = loadConnectionsConfig();
+      const aliases = Object.keys(config);
+      if (aliases.length === 0) {
+        return { content: [{ type: "text", text: "No hay ninguna conexión configurada todavía." }] };
+      }
+      const lines = aliases.map((alias) => {
+        const c = config[alias];
+        return `- ${alias}: ${c.user}@${c.host} (mandante ${c.client})`;
+      });
+      return { content: [{ type: "text", text: lines.join("\n") }] };
     } catch (err) {
       return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };
     }
