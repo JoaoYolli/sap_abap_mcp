@@ -8,6 +8,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { registerGeneralTools } from "./tools/general.js";
 import { registerBasisTools } from "./tools/basis.js";
 import { registerBasisMonitoringTools } from "./tools/basis-monitoring.js";
+import { registerBasisLiveTools } from "./tools/basis-live.js";
 import { registerObjectTools } from "./tools/objects.js";
 import { registerDbTools } from "./tools/db.js";
 import { registerReportTools } from "./tools/reports.js";
@@ -20,6 +21,7 @@ const server = new McpServer({
 registerGeneralTools(server);
 registerBasisTools(server);
 registerBasisMonitoringTools(server);
+registerBasisLiveTools(server);
 registerObjectTools(server);
 registerDbTools(server);
 registerReportTools(server);
