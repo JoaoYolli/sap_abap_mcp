@@ -172,12 +172,14 @@ Cubren cualquier tipo de objeto (`PROG`, `CLAS`, `FUGR`, `FUNC`, `INTF`,
 | `format_source` | Formatea código ABAP con el Pretty Printer estándar de ADT (`/sap/bc/adt/abapsource/prettyprinter`). No requiere que el objeto exista. |
 | `check_syntax` | Chequea sintaxis de un objeto (`/sap/bc/adt/checkruns`), sobre la versión activa o sobre un `source_code` propuesto sin guardar. Verificada en vivo (ambas ramas). Pensada para usar antes de `write_abap_source`/`activate_object`. |
 | `get_where_used` | Where-Used List de un objeto (`/sap/bc/adt/repository/informationsystem/usageReferences`, con el URI como query param). Verificada en vivo. |
+| `run_atc_check` | Chequeo ABAP Test Cockpit (`/sap/bc/adt/atc/*`, flujo de 3 pasos). **Limitación conocida**: el paso de lanzar el run devuelve 500 en el sistema de pruebas (probable falta de autorización ATC del usuario, no un bug de la tool) — ver comentario en `tools/atc.js`. |
 
 ### Datos y ejecución
 
 | Tool | Descripción |
 |---|---|
 | `read_table_data` | `SELECT {fields} FROM {table} [WHERE ...]` genérico vía el SQL Console de ADT. |
+| `describe_table_structure` | Estructura DDIC de una tabla/estructura (campos, tipos, longitud, clave) vía RFC `DDIF_FIELDINFO_GET`. |
 | `run_abap_report` | Ejecuta un programa/report sin pantalla de selección y devuelve su salida. |
 
 ### Checklist diario (agregador)
@@ -241,4 +243,13 @@ implementar (ver planning de nuevas tools).
   chequear lo recién guardado).
 - Usa `list_adt_discovery` para confirmar, antes de depender de una tool
   concreta, si el servicio ADT que necesita realmente está activo en el
-  sistema/release de destino (p.ej. antes de implementar `run_atc_check`).
+  sistema/release de destino.
+- `run_atc_check`: el paso 1 (crear worklist) y el paso 3 (leer resultados)
+  están verificados en vivo. El paso 2 (lanzar el run) devuelve `500
+  ExceptionInternalServerError` en el sistema de pruebas, probado con 3
+  esquemas de body, 2 Content-Type y 2 tipos de objeto distintos — mismo
+  error en los 12 casos, lo que descarta un problema de esquema XML del lado
+  cliente. Sin dump en ST22 ni entradas en `/sap/bc/adt/atc/checkfailures`
+  que lo expliquen; lo más probable es que falte autorización para *ejecutar*
+  runs ATC (a diferencia de solo leer resultados/customizing, que sí
+  funciona). Pendiente de confirmar con el equipo Basis.
