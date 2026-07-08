@@ -5,6 +5,25 @@ import { sapFetch } from "../lib/http.js";
 import { buildQueryString, formatAdtTimestamp, extractTagBlocks, extractChildTagValuesNS } from "../lib/xml.js";
 import { runSqlQuery, getSystemId } from "../lib/sql.js";
 
+// Lógica reutilizable de get_st22_dumps, para que otras tools (p.ej. el
+// agregador de monitoreo diario) puedan pedir los mismos datos sin duplicar
+// la llamada al feed Atom de dumps.
+export async function fetchSt22Dumps(conn, { date_from, date_to, user, max_results = 50 } = {}) {
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const dateFrom = date_from || formatAdtTimestamp(weekAgo);
+  const dateTo = date_to || formatAdtTimestamp(now);
+
+  const url = `/sap/bc/adt/runtime/dumps${buildQueryString({ dateFrom, dateTo, user })}`;
+  const res = await sapFetch(conn, url, { headers: { Accept: "application/atom+xml;type=feed" } });
+  const xml = await res.text();
+
+  const entries = extractTagBlocks(xml, "entry");
+  const dumps = entries.map((b) => ({ ...b.attrs, ...extractChildTagValuesNS(b.inner) }));
+
+  return { dumps: dumps.slice(0, max_results), totalCount: dumps.length, dateFrom, dateTo, xml };
+}
+
 export function registerBasisTools(server) {
   server.tool(
     "get_system_specs",
@@ -64,23 +83,15 @@ export function registerBasisTools(server) {
       const { user, max_results } = args;
       try {
         const conn = getConnection(args);
-        const now = new Date();
-        const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-        const dateFrom = args.date_from || formatAdtTimestamp(weekAgo);
-        const dateTo = args.date_to || formatAdtTimestamp(now);
-
-        const url = `/sap/bc/adt/runtime/dumps${buildQueryString({ dateFrom, dateTo, user })}`;
-        const res = await sapFetch(conn, url, { headers: { Accept: "application/atom+xml;type=feed" } });
-        const xml = await res.text();
-
         // El servicio devuelve un feed Atom (<feed><entry>...>). Por cada <entry> se
         // extraen tanto sus atributos (adtcore:*, etc.) como cualquier elemento hijo
         // con valor de texto (Uri, Timestamp, User, Program...), sin asumir un
         // esquema fijo, porque este endpoint no está documentado oficialmente.
-        const entries = extractTagBlocks(xml, "entry");
-        const dumps = entries.map((b) => ({ ...b.attrs, ...extractChildTagValuesNS(b.inner) }));
+        const { dumps, totalCount, dateFrom, dateTo, xml } = await fetchSt22Dumps(conn, {
+          date_from: args.date_from, date_to: args.date_to, user, max_results,
+        });
 
-        if (dumps.length === 0) {
+        if (totalCount === 0) {
           return {
             content: [{
               type: "text",
@@ -89,8 +100,7 @@ export function registerBasisTools(server) {
           };
         }
 
-        const limited = dumps.slice(0, max_results);
-        const lines = limited.map((d, i) => {
+        const lines = dumps.map((d, i) => {
           const fields = Object.entries(d).map(([k, v]) => `${k}=${v}`).join(" | ");
           return `${i + 1}. ${fields}`;
         });
@@ -98,7 +108,7 @@ export function registerBasisTools(server) {
         return {
           content: [{
             type: "text",
-            text: `Dumps encontrados: ${dumps.length} (mostrando ${limited.length}) entre ${dateFrom} y ${dateTo}\n\n${lines.join("\n")}\n\n--- XML crudo (primeras 2000 chars, para verificar el parseo) ---\n${xml.slice(0, 2000)}`,
+            text: `Dumps encontrados: ${totalCount} (mostrando ${dumps.length}) entre ${dateFrom} y ${dateTo}\n\n${lines.join("\n")}\n\n--- XML crudo (primeras 2000 chars, para verificar el parseo) ---\n${xml.slice(0, 2000)}`,
           }],
         };
       } catch (err) {

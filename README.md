@@ -56,6 +56,24 @@ Para usarlo desde Claude Code (u otro cliente MCP), regístralo apuntando a
 `index.js` con Node como comando, según la configuración de servidores MCP de
 tu cliente.
 
+### Registrar en Claude Code
+
+Desde la carpeta del proyecto:
+
+```bash
+claude mcp add sap-abap -- node index.js
+```
+
+O con ruta absoluta (recomendado si vas a lanzar `claude` desde otro
+directorio):
+
+```bash
+claude mcp add sap-abap -- node "<ruta-al-repo>\sap-mcp\index.js"
+```
+
+Después, usa `/mcp` dentro de Claude Code para comprobar que `sap-abap` está
+conectado (o reconectarlo tras cambios en el código del servidor).
+
 ## Estructura del proyecto
 
 ```
@@ -74,7 +92,14 @@ tools/
   objects.js                Código fuente ABAP: leer, escribir, activar, buscar
   db.js                     Lectura genérica de tablas
   reports.js                Ejecutar programas/reports ABAP
+  daily-monitoring.js        Tool agregadora: checklist básico de monitorización diaria
 ```
+
+Cada módulo de monitorización (`basis.js`, `basis-monitoring.js`, `basis-live.js`)
+exporta, además de sus tools, una función `fetch*` por cada consulta (p.ej.
+`fetchBackgroundJobs`, `fetchLockEntries`). Las tools individuales las llaman
+igual que siempre — nada cambia en su comportamiento — pero eso permite que
+`daily-monitoring.js` las reutilice sin duplicar el SQL/RFC.
 
 Cada `tools/*.js` exporta una función `registerXTools(server)` que registra
 sus tools en la instancia `McpServer`; `index.js` solo importa y llama a cada
@@ -91,6 +116,7 @@ mensaje de error si algo falla).
 |---|---|
 | `list_connections` | Lista los alias de conexión configurados (sin credenciales). |
 | `check_connection` | Comprueba que una conexión está viva y devuelve SID/host/usuario/mandante. |
+| `list_adt_discovery` | Lista los servicios ADT realmente activos en el sistema (vía `/sap/bc/adt/discovery`), con filtro opcional. Útil para confirmar si un servicio (checkruns, atc, usedby...) existe antes de asumirlo. |
 
 ### Sistema
 
@@ -143,6 +169,9 @@ Cubren cualquier tipo de objeto (`PROG`, `CLAS`, `FUGR`, `FUNC`, `INTF`,
 | `get_object_transport` | Comprueba si un objeto ya está asignado a una orden de transporte y lista órdenes candidatas. |
 | `activate_object` | Activa un objeto ABAP. |
 | `search_abap_objects` | Busca objetos por nombre/patrón (actualmente devuelve error del lado SAP en algunos sistemas — `ExceptionParameterNotFound: ris_request_type`). |
+| `format_source` | Formatea código ABAP con el Pretty Printer estándar de ADT (`/sap/bc/adt/abapsource/prettyprinter`). No requiere que el objeto exista. |
+| `check_syntax` | Chequea sintaxis de un objeto (`/sap/bc/adt/checkruns`), sobre la versión activa o sobre un `source_code` propuesto sin guardar. Verificada en vivo (ambas ramas). Pensada para usar antes de `write_abap_source`/`activate_object`. |
+| `get_where_used` | Where-Used List de un objeto (`/sap/bc/adt/repository/informationsystem/usageReferences`, con el URI como query param). Verificada en vivo. |
 
 ### Datos y ejecución
 
@@ -150,6 +179,34 @@ Cubren cualquier tipo de objeto (`PROG`, `CLAS`, `FUGR`, `FUNC`, `INTF`,
 |---|---|
 | `read_table_data` | `SELECT {fields} FROM {table} [WHERE ...]` genérico vía el SQL Console de ADT. |
 | `run_abap_report` | Ejecuta un programa/report sin pantalla de selección y devuelve su salida. |
+
+### Checklist diario (agregador)
+
+| Tool | Descripción |
+|---|---|
+| `monitoreo_basico_basis_diario` | Corre en una sola llamada el checklist básico de monitorización diaria de Basis, reutilizando las tools de arriba. |
+
+`monitoreo_basico_basis_diario` mapea 1:1 contra un checklist estándar de
+monitorización diaria. Cobertura:
+
+| Punto del checklist | Estado | Tool usada |
+|---|---|---|
+| Runtime errors + seguimiento de usuarios (ST22) | ✅ Incluido | `get_st22_dumps` (agrupa por usuario) |
+| System logs (SM21 / SM13 / SM14) | ⚠️ Parcial | `get_update_task_records` (solo SM13/SM14; **SM21 no incluido**) |
+| Batch job exceptions y long running jobs (SM37) | ✅ Incluido | `get_background_jobs` (separa abortados vs. activos de larga duración) |
+| Recursos de sistema, locks y long running jobs (ST02/DBACOCKPIT) | ⛔ Excluido | Sin tool estándar (ver README, sección de Basis-live) |
+| Database Monitor (excepciones/warnings) | ⛔ Excluido | Sin tool |
+| FIORI Gateway logs (/IWFND/ERROR_LOG) | ✅ Incluido | `get_gateway_error_log` |
+| SOIN / SOST | ✅ Incluido | `get_sapconnect_requests` |
+| Health de application servers (SM51/SM50/SM66) | ✅ Incluido | `get_work_processes` |
+| Transactional RFC Monitoring (SM58) | ✅ Incluido | `get_trfc_queue` |
+| Recursos SARFC | ⛔ Excluido | Sin tool |
+| Work Processes y persistent locks | ✅ Incluido | `get_work_processes` + `get_lock_entries` |
+| System Health Check (SICK) | ⛔ Excluido | Sin tool (ver limitaciones de `run_abap_report`) |
+
+Los puntos excluidos no se inventan ni se aproximan con otra tabla: el
+reporte los lista al final como pendientes, para que quede claro qué falta
+implementar (ver planning de nuevas tools).
 
 ## Notas y limitaciones conocidas
 
@@ -168,3 +225,20 @@ Cubren cualquier tipo de objeto (`PROG`, `CLAS`, `FUGR`, `FUNC`, `INTF`,
 - Las tools de "estado en vivo" (`get_lock_entries`, `get_work_processes`)
   dependen de que el servicio ICF `/sap/bc/soap/rfc` esté activo en el
   sistema de destino.
+- `get_where_used` usa el endpoint `usageReferences`, no `whereused` pese a
+  que `list_adt_discovery` anuncia ambos por separado con nombres amigables:
+  `whereused` devuelve `500 "No service found for ID ."` con cualquier body
+  probado. El URI del objeto va como query param (`?uri=`); el body de la
+  request no influye en el resultado, solo debe ser un XML válido con el
+  content-type correcto. Verificado en vivo contra un sistema real (121
+  referencias de una tabla, parseadas correctamente).
+- `check_syntax`: al pasar `source_code`, el contenido va en **base64** dentro
+  de `chkrun:content` — con texto XML-escapado SAP responde `400
+  ExceptionInvalidData` (fallo de deserialización en
+  `SADT_CHECK_RUN_OBJECTS`). Además, la rama sin `source_code` comprueba la
+  **versión activa** del objeto: si acabas de hacer `write_abap_source` pero
+  no has activado, no verá los cambios todavía (compara con `source_code` para
+  chequear lo recién guardado).
+- Usa `list_adt_discovery` para confirmar, antes de depender de una tool
+  concreta, si el servicio ADT que necesita realmente está activo en el
+  sistema/release de destino (p.ej. antes de implementar `run_atc_check`).

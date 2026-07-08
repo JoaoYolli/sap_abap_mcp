@@ -12,6 +12,7 @@ import { registerBasisLiveTools } from "./tools/basis-live.js";
 import { registerObjectTools } from "./tools/objects.js";
 import { registerDbTools } from "./tools/db.js";
 import { registerReportTools } from "./tools/reports.js";
+import { registerDailyMonitoringTools } from "./tools/daily-monitoring.js";
 
 const server = new McpServer({
   name: "sap-abap-mcp",
@@ -25,6 +26,7 @@ registerBasisLiveTools(server);
 registerObjectTools(server);
 registerDbTools(server);
 registerReportTools(server);
+registerDailyMonitoringTools(server);
 
 async function main() {
   const transport = new StdioServerTransport();

@@ -17,6 +17,31 @@ function formatRows(rows) {
   return `${header}\n${sep}\n${body}`;
 }
 
+// Funciones fetch* reutilizables: mismo cuerpo que ya usaba cada tool, solo
+// movido a una función con nombre para que otras tools (p.ej. el agregador
+// de monitoreo diario) puedan pedir los mismos datos sin duplicar la llamada RFC.
+export async function fetchLockEntries(conn, { gname, garg, user } = {}) {
+  const { scalars, tables } = await callRfcFunction(
+    conn,
+    "ENQUE_READ2",
+    { GCLIENT: conn.client, GNAME: gname || "", GARG: garg || "", GUNAME: user || "*" },
+    ["ENQ"]
+  );
+  if (scalars.SUBRC && scalars.SUBRC !== "0") {
+    throw new Error(`ENQUE_READ2 devolvió SUBRC=${scalars.SUBRC}`);
+  }
+  return tables.ENQ.map((r) => ({
+    GNAME: r.GNAME, GARG: r.GARG, GMODE: r.GMODE, GUNAME: r.GUNAME, GOBJ: r.GOBJ, GTCODE: r.GTCODE,
+  }));
+}
+
+export async function fetchWorkProcesses(conn) {
+  const { tables } = await callRfcFunction(conn, "TH_WPINFO", {}, ["WPLIST"]);
+  return tables.WPLIST.map((r) => ({
+    WP_NO: r.WP_NO, WP_TYP: r.WP_TYP, WP_STATUS: r.WP_STATUS, WP_BNAME: r.WP_BNAME, WP_REPORT: r.WP_REPORT, WP_ELTIME: r.WP_ELTIME,
+  }));
+}
+
 export function registerBasisLiveTools(server) {
   server.tool(
     "get_lock_entries",
@@ -31,18 +56,7 @@ export function registerBasisLiveTools(server) {
       const { gname, garg, user } = args;
       try {
         const conn = getConnection(args);
-        const { scalars, tables } = await callRfcFunction(
-          conn,
-          "ENQUE_READ2",
-          { GCLIENT: conn.client, GNAME: gname || "", GARG: garg || "", GUNAME: user || "*" },
-          ["ENQ"]
-        );
-        if (scalars.SUBRC && scalars.SUBRC !== "0") {
-          return { content: [{ type: "text", text: `ERROR: ENQUE_READ2 devolvió SUBRC=${scalars.SUBRC}` }], isError: true };
-        }
-        const rows = tables.ENQ.map((r) => ({
-          GNAME: r.GNAME, GARG: r.GARG, GMODE: r.GMODE, GUNAME: r.GUNAME, GOBJ: r.GOBJ, GTCODE: r.GTCODE,
-        }));
+        const rows = await fetchLockEntries(conn, { gname, garg, user });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
         return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };
@@ -57,8 +71,8 @@ export function registerBasisLiveTools(server) {
     async (args) => {
       try {
         const conn = getConnection(args);
-        const { tables } = await callRfcFunction(conn, "TH_WPINFO", {}, ["WPLIST"]);
-        if (tables.WPLIST.length === 0) {
+        const rows = await fetchWorkProcesses(conn);
+        if (rows.length === 0) {
           return {
             content: [{
               type: "text",
@@ -66,9 +80,6 @@ export function registerBasisLiveTools(server) {
             }],
           };
         }
-        const rows = tables.WPLIST.map((r) => ({
-          WP_NO: r.WP_NO, WP_TYP: r.WP_TYP, WP_STATUS: r.WP_STATUS, WP_BNAME: r.WP_BNAME, WP_REPORT: r.WP_REPORT, WP_ELTIME: r.WP_ELTIME,
-        }));
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
         return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };

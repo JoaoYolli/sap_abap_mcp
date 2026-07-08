@@ -16,6 +16,66 @@ function formatRows(rows) {
   return `${header}\n${sep}\n${body}`;
 }
 
+// Funciones fetch* reutilizables: cada una es la misma consulta que usa la
+// tool correspondiente, expuesta también para que otras tools (p.ej. el
+// agregador de monitoreo diario) puedan pedir los mismos datos sin duplicar
+// el SQL. Las tools de abajo siguen funcionando exactamente igual que antes;
+// solo se movió su cuerpo a estas funciones con nombre.
+export async function fetchBackgroundJobs(conn, { status, job_name, user, date_from, date_to, max_results = 50 } = {}) {
+  const statusMap = { SCHEDULED: "S", RELEASED: "R", READY: "Y", ACTIVE: "A", FINISHED: "F", ABORTED: "X" };
+
+  const conditions = [];
+  conditions.push(status ? `STATUS = '${statusMap[status]}'` : `STATUS IN ('A','X')`);
+  if (job_name) conditions.push(`JOBNAME LIKE '${job_name.toUpperCase()}'`);
+  if (user) conditions.push(`SDLUNAME = '${user.toUpperCase()}'`);
+  if (date_from) conditions.push(`SDLSTRTDT >= '${date_from}'`);
+  if (date_to) conditions.push(`SDLSTRTDT <= '${date_to}'`);
+
+  const sql = `SELECT JOBNAME, JOBCOUNT, STATUS, SDLUNAME, SDLSTRTDT, SDLSTRTTM, ENDDATE, ENDTIME FROM TBTCO WHERE ${conditions.join(" AND ")}`;
+  return runSqlQuery(conn, sql, max_results);
+}
+
+export async function fetchTrfcQueue(conn, { only_errors = true, destination, max_results = 50 } = {}) {
+  const conditions = [];
+  if (only_errors) conditions.push(`ARFCSTATE IN ('CPICERR','SYSFAIL','RESYST')`);
+  if (destination) conditions.push(`ARFCDEST LIKE '${destination.toUpperCase()}'`);
+
+  let sql = `SELECT ARFCDEST, ARFCSTATE, ARFCDATUM, ARFCUZEIT, ARFCUSER, ARFCTCODE, ARFCMSG FROM ARFCSSTATE`;
+  if (conditions.length) sql += ` WHERE ${conditions.join(" AND ")}`;
+  return runSqlQuery(conn, sql, max_results);
+}
+
+export async function fetchUpdateTaskRecords(conn, { only_errors = true, max_results = 50 } = {}) {
+  let sql = `SELECT VBKEY, VBUSR, VBDATE, VBREPORT, VBTCODE, VBRC FROM VBHDR`;
+  if (only_errors) sql += ` WHERE VBRC <> 0`;
+  return runSqlQuery(conn, sql, max_results);
+}
+
+export async function fetchSapconnectRequests(conn, { only_errors = true, date_from, date_to, max_results = 50 } = {}) {
+  const conditions = [];
+  if (only_errors) conditions.push(`MSGTY = 'E'`);
+  if (date_from) conditions.push(`ENTRY_DATE >= '${date_from}'`);
+  if (date_to) conditions.push(`ENTRY_DATE <= '${date_to}'`);
+
+  let sql = `SELECT OBJNO, ENTRY_DATE, ENTRY_TIME, DIRECTION, MSGTY, MSGV1, MSGV2, CREATOR FROM SOST`;
+  if (conditions.length) sql += ` WHERE ${conditions.join(" AND ")}`;
+  return runSqlQuery(conn, sql, max_results);
+}
+
+export async function fetchGatewayErrorLog(conn, { date_from, date_to, user, service_name, http_status, max_results = 50 } = {}) {
+  const conditions = [];
+  if (date_from) conditions.push(`TIMESTAMP >= '${date_from}000000'`);
+  if (date_to) conditions.push(`TIMESTAMP <= '${date_to}235959'`);
+  if (user) conditions.push(`USERNAME = '${user.toUpperCase()}'`);
+  if (service_name) conditions.push(`SERVICE_NAME LIKE '${service_name.toUpperCase()}'`);
+  if (http_status) conditions.push(`HTTP_STATUS = '${http_status}'`);
+
+  // Excluye ERROR_CONTEXT/HTML_PAGE (binarios/pesados) del SELECT.
+  let sql = `SELECT USERNAME, TIMESTAMP, ERROR_TEXT, ERROR_COMPONENT, SERVICE_NAME, HTTP_STATUS, REQUEST_URI FROM /IWFND/SU_ERRLOG`;
+  if (conditions.length) sql += ` WHERE ${conditions.join(" AND ")}`;
+  return runSqlQuery(conn, sql, max_results);
+}
+
 export function registerBasisMonitoringTools(server) {
   server.tool(
     "get_background_jobs",
@@ -33,17 +93,7 @@ export function registerBasisMonitoringTools(server) {
       const { status, job_name, user, date_from, date_to, max_results } = args;
       try {
         const conn = getConnection(args);
-        const statusMap = { SCHEDULED: "S", RELEASED: "R", READY: "Y", ACTIVE: "A", FINISHED: "F", ABORTED: "X" };
-
-        const conditions = [];
-        conditions.push(status ? `STATUS = '${statusMap[status]}'` : `STATUS IN ('A','X')`);
-        if (job_name) conditions.push(`JOBNAME LIKE '${job_name.toUpperCase()}'`);
-        if (user) conditions.push(`SDLUNAME = '${user.toUpperCase()}'`);
-        if (date_from) conditions.push(`SDLSTRTDT >= '${date_from}'`);
-        if (date_to) conditions.push(`SDLSTRTDT <= '${date_to}'`);
-
-        const sql = `SELECT JOBNAME, JOBCOUNT, STATUS, SDLUNAME, SDLSTRTDT, SDLSTRTTM, ENDDATE, ENDTIME FROM TBTCO WHERE ${conditions.join(" AND ")}`;
-        const rows = await runSqlQuery(conn, sql, max_results);
+        const rows = await fetchBackgroundJobs(conn, { status, job_name, user, date_from, date_to, max_results });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
         return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };
@@ -85,13 +135,7 @@ export function registerBasisMonitoringTools(server) {
       const { only_errors, destination, max_results } = args;
       try {
         const conn = getConnection(args);
-        const conditions = [];
-        if (only_errors) conditions.push(`ARFCSTATE IN ('CPICERR','SYSFAIL','RESYST')`);
-        if (destination) conditions.push(`ARFCDEST LIKE '${destination.toUpperCase()}'`);
-
-        let sql = `SELECT ARFCDEST, ARFCSTATE, ARFCDATUM, ARFCUZEIT, ARFCUSER, ARFCTCODE, ARFCMSG FROM ARFCSSTATE`;
-        if (conditions.length) sql += ` WHERE ${conditions.join(" AND ")}`;
-        const rows = await runSqlQuery(conn, sql, max_results);
+        const rows = await fetchTrfcQueue(conn, { only_errors, destination, max_results });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
         return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };
@@ -111,9 +155,7 @@ export function registerBasisMonitoringTools(server) {
       const { only_errors, max_results } = args;
       try {
         const conn = getConnection(args);
-        let sql = `SELECT VBKEY, VBUSR, VBDATE, VBREPORT, VBTCODE, VBRC FROM VBHDR`;
-        if (only_errors) sql += ` WHERE VBRC <> 0`;
-        const rows = await runSqlQuery(conn, sql, max_results);
+        const rows = await fetchUpdateTaskRecords(conn, { only_errors, max_results });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
         return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };
@@ -135,14 +177,7 @@ export function registerBasisMonitoringTools(server) {
       const { only_errors, date_from, date_to, max_results } = args;
       try {
         const conn = getConnection(args);
-        const conditions = [];
-        if (only_errors) conditions.push(`MSGTY = 'E'`);
-        if (date_from) conditions.push(`ENTRY_DATE >= '${date_from}'`);
-        if (date_to) conditions.push(`ENTRY_DATE <= '${date_to}'`);
-
-        let sql = `SELECT OBJNO, ENTRY_DATE, ENTRY_TIME, DIRECTION, MSGTY, MSGV1, MSGV2, CREATOR FROM SOST`;
-        if (conditions.length) sql += ` WHERE ${conditions.join(" AND ")}`;
-        const rows = await runSqlQuery(conn, sql, max_results);
+        const rows = await fetchSapconnectRequests(conn, { only_errors, date_from, date_to, max_results });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
         return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };
@@ -166,17 +201,7 @@ export function registerBasisMonitoringTools(server) {
       const { date_from, date_to, user, service_name, http_status, max_results } = args;
       try {
         const conn = getConnection(args);
-        const conditions = [];
-        if (date_from) conditions.push(`TIMESTAMP >= '${date_from}000000'`);
-        if (date_to) conditions.push(`TIMESTAMP <= '${date_to}235959'`);
-        if (user) conditions.push(`USERNAME = '${user.toUpperCase()}'`);
-        if (service_name) conditions.push(`SERVICE_NAME LIKE '${service_name.toUpperCase()}'`);
-        if (http_status) conditions.push(`HTTP_STATUS = '${http_status}'`);
-
-        // Excluye ERROR_CONTEXT/HTML_PAGE (binarios/pesados) del SELECT.
-        let sql = `SELECT USERNAME, TIMESTAMP, ERROR_TEXT, ERROR_COMPONENT, SERVICE_NAME, HTTP_STATUS, REQUEST_URI FROM /IWFND/SU_ERRLOG`;
-        if (conditions.length) sql += ` WHERE ${conditions.join(" AND ")}`;
-        const rows = await runSqlQuery(conn, sql, max_results);
+        const rows = await fetchGatewayErrorLog(conn, { date_from, date_to, user, service_name, http_status, max_results });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
         return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };
