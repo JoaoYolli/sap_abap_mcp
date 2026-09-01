@@ -29,7 +29,7 @@ export function registerDbTools(server) {
     async (args) => {
       const { table_name, fields, where_clause, max_rows } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const { token: csrfToken, cookie } = await getCsrfToken(conn);
 
         // Servicio "SQL Console" de ADT: recibe una sentencia OpenSQL en texto plano.
@@ -67,7 +67,7 @@ export function registerDbTools(server) {
     async (args) => {
       const { table_name, language } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const { scalars, tables } = await callRfcFunction(
           conn,
           "DDIF_FIELDINFO_GET",

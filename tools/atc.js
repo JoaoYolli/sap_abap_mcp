@@ -90,7 +90,7 @@ export function registerAtcTools(server) {
     async (args) => {
       const { object_name, object_type, function_group, check_variant } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const objectUri = `/sap/bc/adt/${getObjectPath(object_type, object_name, function_group)}`;
         const { worklistId, findings, resultXml } = await runAtcCheck(conn, objectUri, { checkVariant: check_variant });
 

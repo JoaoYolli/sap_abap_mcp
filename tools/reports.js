@@ -14,7 +14,7 @@ export function registerReportTools(server) {
     async (args) => {
       const { program_name } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const { token: csrfToken, cookie } = await getCsrfToken(conn);
 
         const xmlBody = `<?xml version="1.0" encoding="utf-8"?>

@@ -95,7 +95,7 @@ export function registerDailyMonitoringTools(server) {
     async (args) => {
       const { long_running_minutes } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
 
         const now = new Date();
         const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);

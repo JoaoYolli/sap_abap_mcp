@@ -5,6 +5,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 
+import { installExpiryNoticeMiddleware } from "./lib/connection.js";
 import { registerGeneralTools } from "./tools/general.js";
 import { registerBasisTools } from "./tools/basis.js";
 import { registerBasisMonitoringTools } from "./tools/basis-monitoring.js";
@@ -19,6 +20,11 @@ const server = new McpServer({
   name: "sap-abap-mcp",
   version: "1.0.0",
 });
+
+// Antes de registrar ninguna tool: engancha el aviso de "usuario a punto de
+// caducar" (ver lib/connection.js) a la respuesta de cualquier tool, sin que
+// cada tools/*.js tenga que saber nada de esto.
+installExpiryNoticeMiddleware(server);
 
 registerGeneralTools(server);
 registerBasisTools(server);

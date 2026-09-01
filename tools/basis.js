@@ -31,7 +31,7 @@ export function registerBasisTools(server) {
     { ...connectionParams },
     async (args) => {
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const sid = await getSystemId(conn);
 
         const components = await runSqlQuery(
@@ -70,6 +70,46 @@ export function registerBasisTools(server) {
   );
 
   server.tool(
+    "get_user_expiration",
+    "Consulta la fecha de caducidad de un usuario SAP (y su fecha de validez desde), equivalente a los campos 'Válido hasta'/'Válido desde' de la pestaña Datos de logon de SU01 (tabla USR02). Útil para saber si una cuenta sigue activa o cuándo dejará de estarlo.",
+    {
+      ...connectionParams,
+      username: z.string().describe("Nombre de usuario SAP a consultar, ej: J.GARCIA"),
+    },
+    async (args) => {
+      const { username } = args;
+      try {
+        const conn = await getConnection(args);
+        const safeUser = username.toUpperCase().replace(/'/g, "''");
+        const rows = await runSqlQuery(
+          conn,
+          `SELECT BNAME, USTYP, GLTGV, GLTGB FROM USR02 WHERE BNAME = '${safeUser}'`,
+          1
+        );
+
+        if (rows.length === 0) {
+          return { content: [{ type: "text", text: `No existe el usuario "${username}" en este sistema.` }] };
+        }
+
+        const { BNAME, USTYP, GLTGV, GLTGB } = rows[0];
+        // GLTGB = 99991231 es el centinela estándar de SAP para "sin caducidad".
+        const noExpiry = (GLTGB || "").replace(/\D/g, "") === "99991231";
+
+        const lines = [
+          `👤 Usuario: ${BNAME}`,
+          `🏷️  Tipo: ${USTYP || "(desconocido)"}`,
+          `📅 Válido desde: ${GLTGV || "(sin dato)"}`,
+          `📅 Válido hasta: ${noExpiry ? `sin caducidad (${GLTGB})` : (GLTGB || "(sin dato)")}`,
+        ];
+
+        return { content: [{ type: "text", text: lines.join("\n") }] };
+      } catch (err) {
+        return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };
+      }
+    }
+  );
+
+  server.tool(
     "get_st22_dumps",
     "Lista los dumps de ABAP (errores en tiempo de ejecución, equivalente a la transacción ST22) ocurridos en el sistema dentro de un rango de fechas, para poder analizarlos. Usa get_st22_dump_detail sobre el 'uri' de un dump concreto para ver su call stack y texto completo.",
     {
@@ -82,7 +122,7 @@ export function registerBasisTools(server) {
     async (args) => {
       const { user, max_results } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         // El servicio devuelve un feed Atom (<feed><entry>...>). Por cada <entry> se
         // extraen tanto sus atributos (adtcore:*, etc.) como cualquier elemento hijo
         // con valor de texto (Uri, Timestamp, User, Program...), sin asumir un
@@ -127,7 +167,7 @@ export function registerBasisTools(server) {
     async (args) => {
       const { dump_uri } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const path = dump_uri.startsWith("/sap/bc/adt") ? dump_uri : `/sap/bc/adt/runtime/dumps/${dump_uri}`;
         const res = await sapFetch(conn, path, { headers: { Accept: "application/xml, text/plain, */*" } });
         const text = await res.text();

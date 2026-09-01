@@ -92,7 +92,7 @@ export function registerBasisMonitoringTools(server) {
     async (args) => {
       const { status, job_name, user, date_from, date_to, max_results } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const rows = await fetchBackgroundJobs(conn, { status, job_name, user, date_from, date_to, max_results });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
@@ -112,7 +112,7 @@ export function registerBasisMonitoringTools(server) {
     async (args) => {
       const { job_name, job_count } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const sql = `SELECT STEPCOUNT, PROGNAME, STATUS FROM TBTCP WHERE JOBNAME = '${job_name.toUpperCase()}' AND JOBCOUNT = '${job_count}' ORDER BY STEPCOUNT`;
         const rows = await runSqlQuery(conn, sql, 200);
         return { content: [{ type: "text", text: formatRows(rows) }] };
@@ -134,7 +134,7 @@ export function registerBasisMonitoringTools(server) {
     async (args) => {
       const { only_errors, destination, max_results } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const rows = await fetchTrfcQueue(conn, { only_errors, destination, max_results });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
@@ -154,7 +154,7 @@ export function registerBasisMonitoringTools(server) {
     async (args) => {
       const { only_errors, max_results } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const rows = await fetchUpdateTaskRecords(conn, { only_errors, max_results });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
@@ -176,7 +176,7 @@ export function registerBasisMonitoringTools(server) {
     async (args) => {
       const { only_errors, date_from, date_to, max_results } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const rows = await fetchSapconnectRequests(conn, { only_errors, date_from, date_to, max_results });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
@@ -200,7 +200,7 @@ export function registerBasisMonitoringTools(server) {
     async (args) => {
       const { date_from, date_to, user, service_name, http_status, max_results } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const rows = await fetchGatewayErrorLog(conn, { date_from, date_to, user, service_name, http_status, max_results });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
@@ -221,7 +221,7 @@ export function registerBasisMonitoringTools(server) {
     async (args) => {
       const { rfc_type, destination, max_results } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const conditions = [];
         if (rfc_type) conditions.push(`RFCTYPE = '${rfc_type.toUpperCase()}'`);
         if (destination) conditions.push(`RFCDEST LIKE '${destination.toUpperCase()}'`);

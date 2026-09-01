@@ -2,12 +2,37 @@
 // concreta está viva, y descubrir qué servicios ADT están realmente activos
 // en el sistema (vía el documento de descubrimiento estándar de ADT).
 import { z } from "zod";
-import { connectionParams, getConnection, listConnectionAliases } from "../lib/connection.js";
+import { connectionParams, getConnection, listConnectionAliases, openKeeperLoginWindow } from "../lib/connection.js";
 import { sapFetch } from "../lib/http.js";
 import { getSystemId } from "../lib/sql.js";
 import { extractTagBlocks, extractChildTagValuesNS } from "../lib/xml.js";
 
 export function registerGeneralTools(server) {
+  server.tool(
+    "start_keeper_login",
+    'Abre para el usuario una ventana de terminal NUEVA e independiente con el login de Keeper ya en marcha (pide email, contraseña maestra y 2FA). ' +
+    'IMPORTANTE PARA EL AGENTE: es el agente quien debe llamar a esta tool, no el usuario ni un script externo. Llámala de forma proactiva y sin ' +
+    'preguntar antes cada vez que cualquier otra tool de este servidor falle con un mensaje de sesión de Keeper caducada o no iniciada ' +
+    '("Sesión de Keeper caducada o no iniciada..."), y también si el usuario pide iniciar sesión en Keeper explícitamente. ' +
+    'El agente nunca ve ni puede ver lo que el usuario escribe en esa ventana: la contraseña maestra y el 2FA quedan completamente fuera ' +
+    'del MCP y de la conversación. Después de llamar a esta tool, pide al usuario que complete el login ahí y avise cuando termine; ' +
+    'reintenta entonces la operación original que había fallado.',
+    { hours: z.number().optional().describe("Horas que debe durar la sesión antes de caducar (por defecto 10).") },
+    async ({ hours }) => {
+      try {
+        openKeeperLoginWindow(hours);
+        return {
+          content: [{
+            type: "text",
+            text: `🔑 Ventana de login de Keeper abierta (sesión de ${hours ?? 10}h). Pide al usuario que la complete (email, contraseña maestra, 2FA) y avise cuando termine.`,
+          }],
+        };
+      } catch (err) {
+        return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };
+      }
+    }
+  );
+
   server.tool(
     "list_connections",
     `Lista los alias de conexión SAP disponibles, descubiertos automáticamente en la carpeta "Claude Connections" del vault de Keeper (y sus subcarpetas, una por empresa/servidor). No expone host, usuario, mandante ni contraseña: esos datos se resuelven internamente en el servidor MCP a partir del alias, nunca hace falta conocerlos para usar las demás tools.`,
@@ -32,7 +57,7 @@ export function registerGeneralTools(server) {
     { ...connectionParams },
     async (args) => {
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         await sapFetch(conn, "/sap/bc/adt/discovery", {
           headers: { Accept: "application/atomsvc+xml" },
         });
@@ -63,7 +88,7 @@ export function registerGeneralTools(server) {
     async (args) => {
       const { filter } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const res = await sapFetch(conn, "/sap/bc/adt/discovery", {
           headers: { Accept: "application/atomsvc+xml" },
         });

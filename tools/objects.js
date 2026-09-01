@@ -128,7 +128,7 @@ export function registerObjectTools(server) {
     async (args) => {
       const { object_name, object_type, function_group } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const path = getObjectPath(object_type, object_name, function_group);
         const res = await sapFetch(conn, `/sap/bc/adt/${path}/source/main`);
         const source = await res.text();
@@ -155,7 +155,7 @@ export function registerObjectTools(server) {
     async (args) => {
       const { object_name, object_type, source_code, function_group } = args;
       let { transport_request } = args;
-      const conn = getConnection(args);
+      const conn = await getConnection(args);
       const objectPath = getObjectPath(object_type, object_name, function_group);
       // Los módulos de función, a diferencia de otros objetos, no se bloquean en su
       // URI base sino en su propio recurso de código fuente (source/main).
@@ -227,7 +227,7 @@ export function registerObjectTools(server) {
     async (args) => {
       const { object_name, object_type, function_group } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const objectUri = `/sap/bc/adt/${getObjectPath(object_type, object_name, function_group)}`;
 
         const { token: csrfToken, cookie } = await getCsrfToken(conn);
@@ -267,7 +267,7 @@ export function registerObjectTools(server) {
     async (args) => {
       const { object_name, object_type, function_group } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const { token: csrfToken, cookie } = await getCsrfToken(conn);
 
         // El URI del objeto que queremos activar
@@ -320,7 +320,7 @@ export function registerObjectTools(server) {
     async (args) => {
       const { query, object_type, max_results } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         let url = `/sap/bc/adt/repository/informationsystem/search?searchTerm=${encodeURIComponent(query)}&maxResults=${max_results}`;
         if (object_type) {
           url += `&objectType=${object_type.toUpperCase()}`;
@@ -366,7 +366,7 @@ export function registerObjectTools(server) {
     },
     async (args) => {
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const formatted = await formatAbapSource(conn, args.source_code);
         return { content: [{ type: "text", text: formatted }] };
       } catch (err) {
@@ -388,7 +388,7 @@ export function registerObjectTools(server) {
     async (args) => {
       const { object_name, object_type, function_group, source_code } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const objectUri = `/sap/bc/adt/${getObjectPath(object_type, object_name, function_group)}`;
         const { messages, xml } = await checkAbapSyntax(conn, { objectUri, sourceCode: source_code });
 
@@ -433,7 +433,7 @@ export function registerObjectTools(server) {
     async (args) => {
       const { object_name, object_type, function_group, max_results } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const objectUri = `/sap/bc/adt/${getObjectPath(object_type, object_name, function_group)}`;
         const { refs, totalCount, description, xml } = await getWhereUsed(conn, objectUri);
 

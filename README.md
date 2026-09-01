@@ -8,25 +8,42 @@ disponibles en cualquier sistema NetWeaver/S4HANA con Eclipse ADT habilitado,
 más el gateway SOAP RFC clásico para un par de tools que necesitan datos en
 memoria del kernel.
 
+## Requisitos y dependencias
+
+Para que el servidor funcione de punta a punta hacen falta, además del propio
+repo:
+
+- **Node.js 18+** — usa `fetch` global y ES modules (`"type": "module"` en
+  `package.json`). Dependencias npm: `@modelcontextprotocol/sdk` y `zod`
+  (ver `package.json`).
+- **Python 3** con el paquete
+  [`keepercommander`](https://pypi.org/project/keepercommander/) —
+  `lib/connection.js` lo invoca como subproceso (vía el launcher `py`, no
+  `python`, para evitar el alias roto de la Microsoft Store en Windows) para
+  resolver las conexiones SAP a través de Keeper. Sin esto, ninguna tool que
+  necesite `connection` puede funcionar.
+- **Una cuenta de Keeper** con acceso de escritura a un vault, y la carpeta
+  `Claude Connections` creada ahí con al menos un registro de conexión — ver
+  la sección "Configurar conexiones SAP" más abajo. No hace falta Keeper
+  Secrets Manager ni ninguna licencia especial: basta con el login normal
+  (usuario, contraseña maestra, 2FA) que ya usarías para entrar al vault.
+- **Un sistema SAP** (NetWeaver/S4HANA) con los servicios REST de ADT
+  habilitados — los mismos que usa Eclipse ADT — y, para las tools de
+  "estado en vivo" (`get_lock_entries`, `get_work_processes`), el gateway
+  SOAP RFC clásico (`/sap/bc/soap/rfc`) activo. Ver limitaciones conocidas
+  más abajo para lo que no está cubierto por ningún camino estándar.
+- *(Opcional, best-effort)* autorización de lectura sobre la tabla `USR02`
+  para el aviso automático de caducidad de usuario (ver tool
+  `get_user_expiration` y la comprobación diaria en `getConnection`). Si no
+  está disponible, el aviso simplemente no aparece nunca — no rompe ninguna
+  otra tool.
+
 ## Instalación
 
 ```bash
 npm install
-```
-
-Requiere Node.js 18+ (usa `fetch` global y ES modules — `"type": "module"` en
-`package.json`).
-
-Además, la resolución de conexiones necesita **Python 3** con el paquete
-[`keepercommander`](https://pypi.org/project/keepercommander/):
-
-```bash
 py -m pip install -r keeper/requirements.txt
 ```
-
-(en Windows, si el comando `python` no responde por el alias de la Microsoft
-Store, usa el launcher `py`, que es lo que invoca `lib/connection.js`
-internamente).
 
 ## Configurar conexiones SAP
 
@@ -66,8 +83,19 @@ alias, `list_connections` los marca como ambiguos hasta que se rename uno.
 
 ### 2. Iniciar sesión en Keeper (una vez, y cada vez que caduque)
 
-En una terminal normal — **nunca dentro del chat de Claude Code**, para que
-la contraseña maestra y el 2FA no pasen por la conversación con la IA:
+El propio agente se encarga de esto: la tool `start_keeper_login` (registrada
+junto a `list_connections`/`check_connection`) abre una ventana de terminal
+**nueva e independiente** con `keeper/login.py [horas]` ya en marcha. Su
+descripción le deja explícito al agente que es él quien debe llamarla, sin
+que el usuario tenga que pedírselo, en cuanto cualquier otra tool falle con
+un error de sesión de Keeper caducada o no iniciada — así que en la práctica
+solo hace falta completar el login en la ventana que aparece (email,
+contraseña maestra, 2FA) cuando toque. El agente nunca ve ni puede ver lo
+que se escribe ahí.
+
+También se puede lanzar a mano, en una terminal normal — **nunca dentro del
+chat de Claude Code**, para que la contraseña maestra y el 2FA no pasen por
+la conversación con la IA:
 
 ```bash
 py keeper/login.py [horas_de_sesion]
@@ -75,13 +103,7 @@ py keeper/login.py [horas_de_sesion]
 
 Pide email + contraseña maestra + 2FA de Keeper de forma interactiva, activa
 el login persistente del dispositivo y fija cuánto dura esa sesión (por
-defecto 10 horas). Cuando caduque, cualquier tool que necesite una conexión
-devolverá un error con el comando exacto para volver a iniciar sesión.
-
-También se puede pedir al agente que abra el login por ti: ejecuta
-`keeper/start-login.bat [horas]`, que lanza una ventana de terminal nueva e
-independiente ya con el script en marcha — el agente puede lanzarla, pero no
-ve ni puede ver lo que escribes en esa ventana.
+defecto 10 horas).
 
 ### 3. Cómo lo usa el servidor
 
@@ -170,6 +192,7 @@ mensaje de error si algo falla).
 
 | Tool | Descripción |
 |---|---|
+| `start_keeper_login` | Abre una ventana de terminal nueva con el login de Keeper en marcha. El agente la llama solo, sin que se le pida, en cuanto otra tool falla por sesión de Keeper caducada o no iniciada. |
 | `list_connections` | Lista los alias descubiertos en la carpeta "Claude Connections" de Keeper y sus subcarpetas (sin credenciales). |
 | `check_connection` | Comprueba que una conexión está viva y devuelve SID/host/usuario/mandante. |
 | `list_adt_discovery` | Lista los servicios ADT realmente activos en el sistema (vía `/sap/bc/adt/discovery`), con filtro opcional. Útil para confirmar si un servicio (checkruns, atc, usedby...) existe antes de asumirlo. |
@@ -179,6 +202,7 @@ mensaje de error si algo falla).
 | Tool | Descripción |
 |---|---|
 | `get_system_specs` | SID, mandante, release de SAP_BASIS/ABAP y componentes instalados (tabla `CVERS`). |
+| `get_user_expiration` | Fecha de caducidad (y de validez desde) de un usuario SAP, tabla `USR02` — equivalente a "Válido hasta/desde" de SU01. |
 | `get_st22_dumps` | Lista dumps ABAP (ST22) en un rango de fechas, opcionalmente filtrados por usuario. |
 | `get_st22_dump_detail` | Detalle completo (texto, call stack) de un dump concreto. |
 
@@ -268,6 +292,17 @@ implementar (ver planning de nuevas tools).
 
 ## Notas y limitaciones conocidas
 
+- **Aviso automático de caducidad de usuario**: la primera vez que se resuelve
+  cada alias en el día, `getConnection()` (`lib/connection.js`) consulta
+  `USR02` para el usuario configurado en Keeper de esa conexión; si caduca en
+  ≤30 días (o ya caducó), un middleware instalado en `index.js`
+  (`installExpiryNoticeMiddleware`) antepone el aviso a la respuesta de
+  **cualquier** tool que dispare la comprobación ese día — no hace falta que
+  sea `check_connection` ni ninguna tool en concreto. Es best-effort: si la
+  consulta falla (p. ej. sin autorización sobre `USR02`), se ignora en
+  silencio sin afectar a la tool original. Verificado en vivo contra un
+  usuario real con caducidad próxima: el aviso salió correcto y antepuesto a
+  la respuesta de una tool no relacionada con usuarios.
 - **Gestión de conexiones vía Keeper** (`keeper/*.py`): el vault moderno de
   Keeper guarda los custom fields como `"<tipo>:<etiqueta>"` (ej.
   `text:host`, no `host`) — `keeper/_common.py` recorta lo de antes del `:`

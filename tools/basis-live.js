@@ -55,7 +55,7 @@ export function registerBasisLiveTools(server) {
     async (args) => {
       const { gname, garg, user } = args;
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const rows = await fetchLockEntries(conn, { gname, garg, user });
         return { content: [{ type: "text", text: formatRows(rows) }] };
       } catch (err) {
@@ -70,7 +70,7 @@ export function registerBasisLiveTools(server) {
     { ...connectionParams },
     async (args) => {
       try {
-        const conn = getConnection(args);
+        const conn = await getConnection(args);
         const rows = await fetchWorkProcesses(conn);
         if (rows.length === 0) {
           return {
