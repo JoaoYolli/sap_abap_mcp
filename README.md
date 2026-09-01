@@ -302,7 +302,14 @@ implementar (ver planning de nuevas tools).
   consulta falla (p. ej. sin autorización sobre `USR02`), se ignora en
   silencio sin afectar a la tool original. Verificado en vivo contra un
   usuario real con caducidad próxima: el aviso salió correcto y antepuesto a
-  la respuesta de una tool no relacionada con usuarios.
+  la respuesta de una tool no relacionada con usuarios. **Bug corregido**:
+  `GLTGB`/`GLTGV` en `00000000` significa "sin fecha fijada" en SAP, no una
+  fecha real — al principio esto se interpretaba como una fecha muy en el
+  pasado y disparaba un falso "ya caducado" para usuarios que en realidad no
+  tienen ninguna caducidad configurada. `parseSapDate()` en
+  `lib/connection.js` ahora lo trata como "sin dato" (no genera aviso); lo
+  mismo en `get_user_expiration` (`tools/basis.js`), que muestra "sin fecha
+  fijada" en vez del `00000000` crudo.
 - **Gestión de conexiones vía Keeper** (`keeper/*.py`): el vault moderno de
   Keeper guarda los custom fields como `"<tipo>:<etiqueta>"` (ej.
   `text:host`, no `host`) — `keeper/_common.py` recorta lo de antes del `:`

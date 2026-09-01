@@ -92,14 +92,21 @@ export function registerBasisTools(server) {
         }
 
         const { BNAME, USTYP, GLTGV, GLTGB } = rows[0];
-        // GLTGB = 99991231 es el centinela estándar de SAP para "sin caducidad".
-        const noExpiry = (GLTGB || "").replace(/\D/g, "") === "99991231";
+        // GLTGB = 99991231 es un centinela habitual para "sin caducidad" (algunos
+        // sistemas usan 20991231 en su lugar, ver README). GLTGB = 00000000 (o
+        // vacío) significa que no se ha fijado ninguna fecha — tampoco es una
+        // fecha real, no confundir con "caducado". Mismo criterio para GLTGV.
+        const gltgbDigits = (GLTGB || "").replace(/\D/g, "");
+        const gltgvDigits = (GLTGV || "").replace(/\D/g, "");
+        const noExpiry = gltgbDigits === "99991231";
+        const gltgbUnset = !gltgbDigits || gltgbDigits === "00000000";
+        const gltgvUnset = !gltgvDigits || gltgvDigits === "00000000";
 
         const lines = [
           `👤 Usuario: ${BNAME}`,
           `🏷️  Tipo: ${USTYP || "(desconocido)"}`,
-          `📅 Válido desde: ${GLTGV || "(sin dato)"}`,
-          `📅 Válido hasta: ${noExpiry ? `sin caducidad (${GLTGB})` : (GLTGB || "(sin dato)")}`,
+          `📅 Válido desde: ${gltgvUnset ? "sin fecha fijada" : GLTGV}`,
+          `📅 Válido hasta: ${noExpiry ? `sin caducidad (${GLTGB})` : gltgbUnset ? "sin fecha fijada" : GLTGB}`,
         ];
 
         return { content: [{ type: "text", text: lines.join("\n") }] };
