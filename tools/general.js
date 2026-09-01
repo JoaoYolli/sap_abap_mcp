@@ -2,7 +2,7 @@
 // concreta está viva, y descubrir qué servicios ADT están realmente activos
 // en el sistema (vía el documento de descubrimiento estándar de ADT).
 import { z } from "zod";
-import { connectionParams, getConnection, loadConnectionsConfig, CONFIG_PATH } from "../lib/connection.js";
+import { connectionParams, getConnection, listConnectionAliases } from "../lib/connection.js";
 import { sapFetch } from "../lib/http.js";
 import { getSystemId } from "../lib/sql.js";
 import { extractTagBlocks, extractChildTagValuesNS } from "../lib/xml.js";
@@ -10,16 +10,15 @@ import { extractTagBlocks, extractChildTagValuesNS } from "../lib/xml.js";
 export function registerGeneralTools(server) {
   server.tool(
     "list_connections",
-    `Lista únicamente los alias de conexión SAP disponibles (definidos en ${CONFIG_PATH}). No expone host, usuario, mandante ni contraseña: esos datos se resuelven internamente en el servidor MCP a partir del alias, nunca hace falta conocerlos para usar las demás tools.`,
+    `Lista los alias de conexión SAP disponibles, descubiertos automáticamente en la carpeta "Claude Connections" del vault de Keeper (y sus subcarpetas, una por empresa/servidor). No expone host, usuario, mandante ni contraseña: esos datos se resuelven internamente en el servidor MCP a partir del alias, nunca hace falta conocerlos para usar las demás tools.`,
     {},
     async () => {
       try {
-        const config = loadConnectionsConfig();
-        const aliases = Object.keys(config);
+        const aliases = listConnectionAliases();
         if (aliases.length === 0) {
-          return { content: [{ type: "text", text: "No hay ninguna conexión configurada todavía." }] };
+          return { content: [{ type: "text", text: "No hay ninguna conexión en la carpeta \"Claude Connections\" de Keeper todavía." }] };
         }
-        const lines = aliases.map((alias) => `- ${alias}`);
+        const lines = aliases.map(({ alias, ambiguous }) => `- ${alias}${ambiguous ? "  ⚠️ ambiguo: varios registros coinciden con este alias" : ""}`);
         return { content: [{ type: "text", text: lines.join("\n") }] };
       } catch (err) {
         return { content: [{ type: "text", text: `ERROR: ${err.message}` }], isError: true };

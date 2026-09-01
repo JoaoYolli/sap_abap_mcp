@@ -1,3 +1,5 @@
 node_modules/
 claude.bat
 claude-context.md
+__pycache__/
+*.pyc

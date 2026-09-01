@@ -17,31 +17,81 @@ npm install
 Requiere Node.js 18+ (usa `fetch` global y ES modules — `"type": "module"` en
 `package.json`).
 
+Además, la resolución de conexiones necesita **Python 3** con el paquete
+[`keepercommander`](https://pypi.org/project/keepercommander/):
+
+```bash
+py -m pip install -r keeper/requirements.txt
+```
+
+(en Windows, si el comando `python` no responde por el alias de la Microsoft
+Store, usa el launcher `py`, que es lo que invoca `lib/connection.js`
+internamente).
+
 ## Configurar conexiones SAP
 
 Las credenciales **nunca** viajan por el chat ni como argumentos de las
-tools. Viven en un archivo local, fuera del repo:
+tools, y **no viven en ningún archivo local del repo ni de la máquina**: se
+guardan en Keeper y se piden en el momento a través de Keeper Commander.
+
+### 1. Organizar las conexiones en Keeper
+
+Crea una carpeta llamada **`Claude Connections`** en el nivel superior de tu
+vault de Keeper. Dentro, una subcarpeta por empresa/servidor (o registros
+sueltos directamente si no hace falta agrupar). Cada conexión SAP es un
+registro tipo **Login** con:
+
+- `login` → usuario SAP
+- `password` → contraseña SAP
+- un campo personalizado de texto llamado **`host`** → URL base, ej. `http://mihost:8000`
+- un campo personalizado de texto llamado **`client`** → mandante, ej. `100`
 
 ```
-%USERPROFILE%\.sap-mcp\connections.json      (Windows)
-~/.sap-mcp/connections.json                  (Linux/Mac)
+Claude Connections/
+  EmpresaA/
+    Prod          (host, client, login, password)
+    Dev
+  EmpresaB/
+    Prod
 ```
 
-La primera vez que se usa cualquier tool sin este archivo, el servidor lo
-crea automáticamente con una plantilla vacía y lanza un error pidiendo
-rellenarlo:
+El **alias** que se usa como parámetro `connection` en las tools se calcula
+solo a partir de esa estructura: el título del registro si está directamente
+en `Claude Connections`, o `"<subcarpeta>/<título>"` si está dentro de una
+subcarpeta (ej. `EmpresaA/Prod`). No hace falta editar ningún archivo para
+dar de alta una conexión nueva — basta con crear el registro en Keeper. Usa
+la tool `list_connections` para ver qué alias hay disponibles ahora mismo
+(sin exponer host/usuario/contraseña); si dos registros generan el mismo
+alias, `list_connections` los marca como ambiguos hasta que se rename uno.
 
-```json
-{
-  "dev": { "host": "http://mihost:8000", "client": "100", "user": "usuario", "password": "clave" },
-  "prod": { "host": "https://otrohost:443", "client": "300", "user": "usuario", "password": "clave" }
-}
+### 2. Iniciar sesión en Keeper (una vez, y cada vez que caduque)
+
+En una terminal normal — **nunca dentro del chat de Claude Code**, para que
+la contraseña maestra y el 2FA no pasen por la conversación con la IA:
+
+```bash
+py keeper/login.py [horas_de_sesion]
 ```
 
-Cada clave del objeto (`dev`, `prod`, `aspa_hana`, ...) es un **alias de
-conexión** que luego se pasa como parámetro `connection` a cualquier tool.
-Usa la tool `list_connections` para ver qué alias hay configurados sin
-exponer host/usuario/contraseña.
+Pide email + contraseña maestra + 2FA de Keeper de forma interactiva, activa
+el login persistente del dispositivo y fija cuánto dura esa sesión (por
+defecto 10 horas). Cuando caduque, cualquier tool que necesite una conexión
+devolverá un error con el comando exacto para volver a iniciar sesión.
+
+También se puede pedir al agente que abra el login por ti: ejecuta
+`keeper/start-login.bat [horas]`, que lanza una ventana de terminal nueva e
+independiente ya con el script en marcha — el agente puede lanzarla, pero no
+ve ni puede ver lo que escribes en esa ventana.
+
+### 3. Cómo lo usa el servidor
+
+`lib/connection.js` no guarda nada: en cada `getConnection()`/`list_connections`
+invoca `keeper/fetch_secret.py`/`keeper/list_connections.py`, que reutilizan
+la sesión de `login.py` para consultar Keeper Commander en vivo (con una
+caché en memoria de 5 minutos para no lanzar un proceso Python en cada
+llamada). Nunca hay contraseñas en disco: solo el propio proceso de Keeper
+(fuera del control del servidor MCP) y una sesión de dispositivo revocable
+en cualquier momento desde el vault.
 
 ## Arrancar el servidor
 
@@ -79,11 +129,17 @@ conectado (o reconectarlo tras cambios en el código del servidor).
 ```
 index.js                   Arranque: crea el McpServer y registra cada módulo de tools
 lib/
-  connection.js             Resolución de alias -> credenciales (connections.json)
+  connection.js             Resolución de alias -> credenciales, vía Keeper Commander (keeper/*.py)
   http.js                   fetch autenticado a ADT, CSRF, lock/unlock, resolución de rutas de objetos
   xml.js                    Parseo XML con regex (sin dependencias) + escapeXml
   sql.js                    Ejecuta OpenSQL vía el servicio ADT "SQL Console" (datapreview/freestyle)
   rfc.js                    Cliente mínimo del gateway SOAP RFC clásico (/sap/bc/soap/rfc)
+keeper/
+  login.py                  Login interactivo de Keeper (usuario/contraseña/2FA), ejecutar a mano en terminal
+  start-login.bat           Abre una ventana de terminal nueva con login.py ya en marcha (para que la lance el agente)
+  _common.py                Helpers compartidos: sesión persistente, descubrimiento de carpetas/registros
+  list_connections.py       Descubre los alias disponibles en la carpeta "Claude Connections"
+  fetch_secret.py           Resuelve un alias a {host, client, user, password} (invocado por lib/connection.js)
 tools/
   general.js                Conexión: listar alias, comprobar conectividad
   basis.js                  Sistema: specs, dumps ST22
@@ -114,7 +170,7 @@ mensaje de error si algo falla).
 
 | Tool | Descripción |
 |---|---|
-| `list_connections` | Lista los alias de conexión configurados (sin credenciales). |
+| `list_connections` | Lista los alias descubiertos en la carpeta "Claude Connections" de Keeper y sus subcarpetas (sin credenciales). |
 | `check_connection` | Comprueba que una conexión está viva y devuelve SID/host/usuario/mandante. |
 | `list_adt_discovery` | Lista los servicios ADT realmente activos en el sistema (vía `/sap/bc/adt/discovery`), con filtro opcional. Útil para confirmar si un servicio (checkruns, atc, usedby...) existe antes de asumirlo. |
 
@@ -212,6 +268,18 @@ implementar (ver planning de nuevas tools).
 
 ## Notas y limitaciones conocidas
 
+- **Gestión de conexiones vía Keeper** (`keeper/*.py`): el vault moderno de
+  Keeper guarda los custom fields como `"<tipo>:<etiqueta>"` (ej.
+  `text:host`, no `host`) — `keeper/_common.py` recorta lo de antes del `:`
+  al buscar por nombre, así que basta con que la etiqueta visible en el vault
+  sea `host`/`client` (sin distinguir mayúsculas), el prefijo de tipo da
+  igual. Verificado en vivo contra dos conexiones reales (`Aspa/Hana`,
+  `Aspa/Des`).
+- La sesión de Keeper Commander la crea `keeper/login.py` (login real,
+  interactivo, nunca a través de Claude Code) y caduca según las horas que se
+  le pasen; mientras esté viva, `fetch_secret.py`/`list_connections.py` no
+  piden nada por consola. Si caduca, cualquier tool que necesite conexión
+  devuelve el comando exacto para volver a iniciar sesión.
 - `search_abap_objects` está roto en algunos sistemas (error 400
   `ExceptionParameterNotFound: ris_request_type` del lado SAP). Alternativa:
   usar `read_abap_source`/`get_object_transport` conociendo ya el nombre del
