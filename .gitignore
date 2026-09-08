@@ -3,3 +3,5 @@ claude.bat
 claude-context.md
 __pycache__/
 *.pyc
+tmp/
+start-remote-control.bat
