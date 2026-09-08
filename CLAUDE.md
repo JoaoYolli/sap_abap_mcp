@@ -28,7 +28,8 @@ sesión en Keeper" explícitamente:
 
 ## SAP vía Chrome es el último recurso, no una alternativa equivalente a ADT
 
-El prototipo de SAP GUI para HTML vía navegador (siguiente sección) cuesta
+La feature de SAP GUI para HTML vía navegador (siguiente sección) — no un
+prototipo, es funcionalidad estable de este repo — cuesta
 **muchos más tokens** que cualquier tool `mcp__sap-abap__*` sobre ADT — cada
 paso implica navegar, leer árbol de accesibilidad o capturas, e interpretar
 una pantalla completa, en vez de una única llamada estructurada. Por eso:
@@ -49,7 +50,7 @@ una pantalla completa, en vez de una única llamada estructurada. Por eso:
 
 ## Automatización de navegador/PC: prioriza siempre la alternativa más barata en tokens
 
-Este repo incluye un prototipo de acceso a SAP GUI para HTML vía navegador
+Este repo incluye una feature de acceso a SAP GUI para HTML vía navegador
 (`keeper/webgui-proxy.js` + `start-webgui.bat`, pensado para usarse con la
 extensión `claude-in-chrome`) para cubrir lo que ADT no puede. Al operarlo —
 o cualquier otra tarea que implique interactuar con una interfaz visual—,

@@ -293,13 +293,16 @@ Los puntos excluidos no se inventan ni se aproximan con otra tabla: el
 reporte los lista al final como pendientes, para que quede claro qué falta
 implementar (ver planning de nuevas tools).
 
-## Prototipo: SAP GUI para HTML (WebGUI) en el navegador
+## Feature: SAP GUI para HTML (WebGUI) en el navegador
 
 Para lo que ADT no cubre (pantallas de selección interactivas, transacciones
-sin equivalente REST, SM50/DBACOCKPIT/SICK, etc.), hay un prototipo que abre
-SAP GUI para HTML (`/sap/bc/gui/sap/its/webgui`) en Chrome vía la extensión
+sin equivalente REST, SM50/DBACOCKPIT/SICK, etc.), esta feature abre SAP GUI
+para HTML (`/sap/bc/gui/sap/its/webgui`) en Chrome vía la extensión
 `claude-in-chrome`, sin que el host real del servidor ni las credenciales
-pasen nunca por el agente/la conversación:
+pasen nunca por el agente/la conversación. No es un prototipo desechable:
+es funcionalidad estable del repo, pero consume muchos más tokens que una
+tool ADT — úsese solo cuando no exista tool ADT para la tarea (ver
+`CLAUDE.md`), y avisando siempre de ese coste al usarla.
 
 ```
 Chrome (claude-in-chrome) --> http://localhost:<puerto>/...   (esto es lo único que ve el agente)
