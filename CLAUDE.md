@@ -73,3 +73,17 @@ navegador se resuelve dentro de una pestaña con `claude-in-chrome`. Usa
 control total del PC únicamente si el usuario lo pide de forma explícita
 para ese caso concreto (p. ej. "necesito que controles todo el PC para
 esto"); sin esa petición explícita, ni lo propongas como alternativa.
+
+**Por qué esta jerarquía**: no es solo alcance/seguridad, también es coste
+en tokens. `claude-in-chrome` sobre una sola pestaña (con texto estructurado
+como primer nivel) es la opción más barata de las dos formas de "ver la
+pantalla"; controlar el PC entero a nivel de sistema operativo es más caro
+todavía que el propio navegador, porque cada acción implica capturas de
+pantalla completas y coordenadas en vez de una pestaña acotada y su árbol
+de accesibilidad. Es decir: ADT (más barato) < `claude-in-chrome` en una
+pestaña (caro frente a ADT, pero la opción correcta cuando no hay tool ADT)
+< control total del PC (el más caro con diferencia, y por eso excluido por
+defecto salvo petición explícita del usuario). Esto no cambia el resto de
+reglas de esta sección: sigue avisando siempre del coste elevado del
+navegador frente a ADT, y sigue sin usarse control total del PC sin
+petición explícita.
