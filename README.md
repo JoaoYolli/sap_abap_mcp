@@ -64,25 +64,39 @@ cambios de la rama main en https://github.com/JoaoYolli/sap_abap_mcp .
 Actualízalo tú mismo, sin pedirme que ejecute nada a mano salvo lo que
 se indica explícitamente al final:
 
-1. Localiza la carpeta del repo local: revisa cómo está registrado el
+1. Antes de tocar nada, dime que cierre cualquier otra sesión de Claude
+   Code (u otro agente/cliente MCP) que pueda estar abierta en este mismo
+   equipo y usando este mismo repo — una segunda sesión tocando la misma
+   carpeta a la vez puede bloquear archivos o pisar cambios a mitad de la
+   actualización. Pregúntame si hay alguna abierta y espera a que confirme
+   que las cerró antes de seguir.
+2. Localiza la carpeta del repo local: revisa cómo está registrado el
    servidor "sap-abap" en este cliente (por ejemplo `claude mcp list` en
    Claude Code, o el archivo de configuración de servidores MCP que use tu
    cliente) para encontrar la ruta que usa el comando "node index.js"; esa
    carpeta es el repo.
-2. Dentro de esa carpeta, ejecuta `git status`. Si hay cambios locales sin
-   commitear que no reconozcas como tuyos de esta tarea, para y avísame en
-   vez de descartarlos o sobreescribirlos.
-3. Ejecuta `git pull` (rama main, remoto origin) para traer los últimos
-   cambios.
-4. Si `package.json` cambió en el pull, ejecuta `npm install`. Si
+3. Dentro de esa carpeta, ejecuta `git status` y `git log --oneline -5`.
+   Si hay cualquier cosa que solo existe en local y no en el remoto —
+   cambios sin commitear, o commits locales por delante de `origin/main`
+   que no llegaron a subirse — no los descartes sin más, pero tampoco
+   dejes que bloqueen la actualización: como mucho, consérvalos creando
+   una rama aparte (por ejemplo `backup-local-<fecha>`, commiteando ahí lo
+   que estuviera sin commitear si hace falta) que apunte a ese estado. La
+   prioridad, pase lo que pase con esos cambios, es que la carpeta acabe
+   con la versión más actualizada del repo remoto — no la versión local.
+4. Con los cambios locales ya a salvo en esa rama de respaldo (si los
+   había), deja la rama main exactamente igual a `origin/main` (`git fetch
+   origin` y alinear `main` a `origin/main`). Dime qué rama de respaldo
+   creaste, si aplica, y a qué commit quedó `main`.
+5. Si `package.json` cambió en la actualización, ejecuta `npm install`. Si
    `keeper/requirements.txt` cambió, ejecuta `py -m pip install -r
    keeper/requirements.txt` (usa el launcher `py`, no `python`, en Windows;
    `python3` en macOS/Linux).
-5. El servidor MCP corre como proceso aparte del tuyo, así que no puedes
+6. El servidor MCP corre como proceso aparte del tuyo, así que no puedes
    forzar su reconexión: dime que ejecute `/mcp` en Claude Code (o el
    equivalente de mi cliente) para reconectar "sap-abap" con el código ya
    actualizado.
-6. Confírmame con `git log -1 --oneline` a qué commit quedó actualizado el
+7. Confírmame con `git log -1 --oneline` a qué commit quedó actualizado el
    repo.
 ```
 
