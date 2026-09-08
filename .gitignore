@@ -4,4 +4,5 @@ claude-context.md
 __pycache__/
 *.pyc
 tmp/
-start-remote-control.bat
+start-claude.bat
+install-startup-shortcut.bat

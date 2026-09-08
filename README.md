@@ -162,6 +162,9 @@ keeper/
   _common.py                Helpers compartidos: sesión persistente, descubrimiento de carpetas/registros
   list_connections.py       Descubre los alias disponibles en la carpeta "Claude Connections"
   fetch_secret.py           Resuelve un alias a {host, client, user, password} (invocado por lib/connection.js)
+  webgui-proxy.js           Proxy inverso local para SAP GUI para HTML (WebGUI) — ver sección dedicada más abajo
+  start-webgui.bat          Abre una ventana de terminal nueva con webgui-proxy.js ya en marcha
+  stop-webgui.bat           Rollback de emergencia: mata el proceso que escucha en el puerto del proxy
 tools/
   general.js                Conexión: listar alias, comprobar conectividad
   basis.js                  Sistema: specs, dumps ST22
@@ -289,6 +292,51 @@ monitorización diaria. Cobertura:
 Los puntos excluidos no se inventan ni se aproximan con otra tabla: el
 reporte los lista al final como pendientes, para que quede claro qué falta
 implementar (ver planning de nuevas tools).
+
+## Prototipo: SAP GUI para HTML (WebGUI) en el navegador
+
+Para lo que ADT no cubre (pantallas de selección interactivas, transacciones
+sin equivalente REST, SM50/DBACOCKPIT/SICK, etc.), hay un prototipo que abre
+SAP GUI para HTML (`/sap/bc/gui/sap/its/webgui`) en Chrome vía la extensión
+`claude-in-chrome`, sin que el host real del servidor ni las credenciales
+pasen nunca por el agente/la conversación:
+
+```
+Chrome (claude-in-chrome) --> http://localhost:<puerto>/...   (esto es lo único que ve el agente)
+  --> keeper/webgui-proxy.js (resuelve el alias vía Keeper, igual que getConnection;
+      host/usuario/contraseña quedan SOLO en la memoria de este proceso)
+    --> https://<host-real>/...   (Authorization: Basic ... inyectado aquí)
+```
+
+- **Arrancar**: `keeper/start-webgui.bat <alias> [puerto] [transaccion]` abre
+  una ventana de terminal nueva e independiente con `webgui-proxy.js` ya en
+  marcha (mismo patrón que `start-login.bat`: nunca se lanza desde dentro del
+  proceso del servidor MCP, que no tiene desktop propio). Puerto por defecto:
+  `4728`.
+- **Usar**: navegar a `http://localhost:<puerto>/` — redirige automáticamente
+  a WebGUI con el mandante ya puesto y, si se indicó, la transacción inicial
+  (`~transaction=`). El login es transparente (Basic Auth inyectado por el
+  proxy en cada petición), no aparece ninguna pantalla de logon.
+- **Rollback**: cerrar la ventana del proxy (o Ctrl+C), o ejecutar
+  `keeper/stop-webgui.bat [puerto]` si la ventana se cerró de forma sucia. El
+  proxy no escribe nada en disco ni deja perfil de navegador ni toca
+  `/etc/hosts` — pararlo deja el sistema exactamente como estaba antes.
+- **Qué sí ve el agente**: únicamente `localhost:<puerto>` y las rutas/paths
+  de WebGUI — nunca el host real, ni el usuario, ni la contraseña. El
+  redirect de `/` y la reescritura de `Location` en los redirects del
+  backend son siempre relativos al host real (`webgui-proxy.js` los
+  reescribe a `localhost`).
+- **Limitación conocida**: el proxy reescribe la cabecera `Location` de los
+  redirects, pero no reescribe URLs absolutas que puedan venir *dentro* del
+  cuerpo HTML/JS de la propia página (poco habitual en WebGUI clásico, que
+  usa rutas relativas, pero no está descartado en todos los sistemas/temas).
+  Si esto llega a pasar, el agente vería el host real al leer el contenido
+  de la página con `read_page`/`get_page_text`.
+- **Prioridad de herramientas al operar WebGUI**: ver la sección
+  "Automatización de navegador/PC" de `CLAUDE.md` — primero texto
+  estructurado (`read_page`/`find`/`get_page_text`), luego `screenshot`
+  acotado a la pestaña; el control total del PC/escritorio queda excluido
+  por defecto.
 
 ## Notas y limitaciones conocidas
 
