@@ -26,6 +26,27 @@ sesión en Keeper" explícitamente:
   maestra, 2FA — tú nunca ves esos datos) y avise cuando termine, y
   reintenta entonces la operación original.
 
+## SAP vía Chrome es el último recurso, no una alternativa equivalente a ADT
+
+El prototipo de SAP GUI para HTML vía navegador (siguiente sección) cuesta
+**muchos más tokens** que cualquier tool `mcp__sap-abap__*` sobre ADT — cada
+paso implica navegar, leer árbol de accesibilidad o capturas, e interpretar
+una pantalla completa, en vez de una única llamada estructurada. Por eso:
+
+- Antes de tocar el navegador, comprueba si ya existe una tool ADT que
+  resuelva la tarea (revisa la lista de tools `mcp__sap-abap__*` disponibles,
+  o `mcp__sap-abap__list_adt_discovery` si dudas de si el endpoint existe).
+  Si existe, úsala siempre — no ofrezcas el navegador como alternativa "por
+  si acaso" cuando ya hay una tool ADT que cubre lo pedido.
+- Solo propón/usa el navegador cuando confirmes que no hay tool ADT para esa
+  tarea concreta (p. ej. ST02/DBACOCKPIT, SOST, o cualquier transacción sin
+  tool dedicada todavía).
+- Cada vez que propongas o inicies el uso del navegador para SAP, dilo
+  explícitamente y avisa del coste elevado en tokens frente a ADT, para que
+  quien lea la respuesta sepa que esa vía es más cara — no lo des por
+  sobreentendido ni lo omitas aunque ya lo hayas avisado antes en la misma
+  conversación.
+
 ## Automatización de navegador/PC: prioriza siempre la alternativa más barata en tokens
 
 Este repo incluye un prototipo de acceso a SAP GUI para HTML vía navegador
