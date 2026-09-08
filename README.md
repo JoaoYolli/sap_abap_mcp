@@ -45,6 +45,105 @@ npm install
 py -m pip install -r keeper/requirements.txt
 ```
 
+## Instalar o actualizar vía un agente
+
+Si en vez de escribir los comandos a mano prefieres que un agente de IA
+(Claude Code u otro cliente MCP) lo haga por ti, copia y pega uno de estos
+dos prompts según el caso. Ambos asumen un agente con acceso a terminal
+(Bash/PowerShell) en la máquina donde vive o va a vivir el repo.
+
+### Prompt para actualizar una instalación ya existente
+
+Úsalo cuando el MCP `sap-abap` ya está registrado en tu cliente pero
+sospechas que el repo local no tiene los últimos cambios de `main`.
+
+```
+Ya tengo el servidor MCP "sap-abap" (repo sap-mcp) registrado en este
+cliente, pero puede que la copia local del repo no tenga los últimos
+cambios de la rama main en https://github.com/JoaoYolli/sap_abap_mcp .
+Actualízalo tú mismo, sin pedirme que ejecute nada a mano salvo lo que
+se indica explícitamente al final:
+
+1. Localiza la carpeta del repo local: revisa cómo está registrado el
+   servidor "sap-abap" en este cliente (por ejemplo `claude mcp list` en
+   Claude Code, o el archivo de configuración de servidores MCP que use tu
+   cliente) para encontrar la ruta que usa el comando "node index.js"; esa
+   carpeta es el repo.
+2. Dentro de esa carpeta, ejecuta `git status`. Si hay cambios locales sin
+   commitear que no reconozcas como tuyos de esta tarea, para y avísame en
+   vez de descartarlos o sobreescribirlos.
+3. Ejecuta `git pull` (rama main, remoto origin) para traer los últimos
+   cambios.
+4. Si `package.json` cambió en el pull, ejecuta `npm install`. Si
+   `keeper/requirements.txt` cambió, ejecuta `py -m pip install -r
+   keeper/requirements.txt` (usa el launcher `py`, no `python`, en Windows;
+   `python3` en macOS/Linux).
+5. El servidor MCP corre como proceso aparte del tuyo, así que no puedes
+   forzar su reconexión: dime que ejecute `/mcp` en Claude Code (o el
+   equivalente de mi cliente) para reconectar "sap-abap" con el código ya
+   actualizado.
+6. Confírmame con `git log -1 --oneline` a qué commit quedó actualizado el
+   repo.
+```
+
+### Prompt para instalar desde cero (incluye contexto completo)
+
+Úsalo con un agente que no conoce este proyecto todavía — por eso lleva
+todo el contexto necesario incluido, no solo los comandos.
+
+```
+Quiero que instales de cero, en esta máquina, el servidor MCP "sap-abap"
+(repo "sap-mcp"): un servidor MCP en Node.js que expone como tools de IA
+operaciones sobre un sistema SAP (ABAP/ADT vía servicios REST estándar, más
+el gateway SOAP RFC clásico para un par de tools de estado en vivo). No es
+un cliente SAP GUI ni instala nada del lado SAP. El repo está en
+https://github.com/JoaoYolli/sap_abap_mcp (rama main).
+
+Requisitos que debes comprobar o pedirme antes de continuar (no los asumas
+ni los saltes):
+- Node.js 18+ y Python 3 disponibles en el PATH (en Windows, el launcher
+  se llama `py`, no `python` — evita el alias roto de la Microsoft Store).
+- Una cuenta de Keeper (gestor de contraseñas) con acceso de escritura a un
+  vault. Esto es mío, no lo tienes tú ni puedes crearlo por mí — si no la
+  tengo, dímelo y para ahí en vez de improvisar un almacén de credenciales
+  alternativo. Las credenciales SAP viven solo en Keeper, nunca en el chat
+  ni en archivos del repo.
+
+Pasos:
+1. Pregúntame en qué carpeta quiero clonar el repo (o usa una carpeta de
+   proyectos razonable por defecto si te la indico) y clónalo:
+   `git clone https://github.com/JoaoYolli/sap_abap_mcp.git`.
+2. Dentro de esa carpeta: `npm install` (dependencias: solo
+   `@modelcontextprotocol/sdk` y `zod`) y `py -m pip install -r
+   keeper/requirements.txt` (instala `keepercommander`, con el launcher
+   `py`/`python3` según el sistema operativo).
+3. Regístralo como servidor MCP en mi cliente. Si es Claude Code, usa ruta
+   absoluta para que funcione lances `claude` desde donde lances:
+   `claude mcp add sap-abap -- node "<ruta-absoluta-al-repo>/index.js"`.
+   Si mi cliente MCP es otro, adapta el registro a su forma de añadir un
+   servidor stdio con ese mismo comando (`node index.js` en la carpeta del
+   repo).
+4. Este repo tiene una feature opcional (no hace falta para las tools ADT
+   principales) que abre SAP GUI para HTML en el navegador para lo que ADT
+   no cubre, y depende de otro MCP: la extensión/cliente "Claude in
+   Chrome" (tools `mcp__claude-in-chrome__*`). Comprueba si ya tienes esas
+   tools disponibles en esta sesión; si no, esa extensión se instala por
+   fuera de este repo (Chrome Web Store + habilitarla en tu cliente MCP),
+   tú no puedes instalarla vía terminal — límitate a avisarme de que existe
+   esa dependencia opcional y de cómo activarla, no lo bloquees ni lo
+   intentes forzar.
+5. Dime que ejecute `/mcp` en Claude Code (o el equivalente de mi cliente)
+   para confirmar que "sap-abap" quedó conectado.
+6. Las credenciales SAP se configuran en mi vault de Keeper, no en el repo:
+   guíame para crear ahí una carpeta "Claude Connections" con al menos un
+   registro tipo Login (campos `login`, `password`, y los custom fields de
+   texto `host` y `client`) — tú no tienes acceso a mi vault, así que esta
+   parte la hago yo siguiendo tus instrucciones, no la automatices.
+7. Una vez conectado y con al menos una conexión creada, verifica que todo
+   funciona llamando a la tool `list_connections` y luego `check_connection`
+   sobre uno de los alias que aparezcan, y dime el resultado.
+```
+
 ## Configurar conexiones SAP
 
 Las credenciales **nunca** viajan por el chat ni como argumentos de las
