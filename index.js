@@ -87,6 +87,13 @@ terminal que trae el error, en el mismo turno -- no se lo derives al
 usuario salvo que no tengas ninguna herramienta de terminal disponible.
 
 Detalle completo y razonamiento de cada punto en CLAUDE.md de este repo.
+
+Si más abajo aparece un bloque "Instrucciones personales de este usuario",
+tenlo en cuenta automáticamente desde el primer turno de esta sesión, igual
+que el resto de reglas de este bloque -- son reglas que el propio usuario
+guardó para que su agente las siga sin tener que repetirlas cada vez. Se
+gestionan con las tools add_personal_instruction / list_personal_instructions
+/ remove_personal_instruction.
 ${formatPersonalInstructionsBlock()}`.trim(),
   },
 );

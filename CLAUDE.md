@@ -239,9 +239,13 @@ siempre tú el login de Keeper sin preguntar"). Estas instrucciones:
   (`tools/user-instructions.js` + `lib/user-instructions.js`) — nunca
   edites ese JSON a mano ni con Bash/PowerShell, usa siempre las tools.
 - se inyectan automáticamente en las `instructions` del servidor MCP al
-  arrancar (`index.js` llama a `formatPersonalInstructionsBlock()`), así
-  que cualquier cliente (Claude u otro) las recibe desde el primer turno de
-  cada sesión nueva sin que el usuario tenga que pedirlo. Un cambio hecho
-  con add/remove_personal_instruction se aplica desde el próximo arranque
-  del servidor MCP, no a mitad de la sesión actual — avisa de eso si el
-  usuario espera que valga ya mismo.
+  arrancar (`index.js` llama a `formatPersonalInstructionsBlock()`), junto
+  con una regla explícita de que el agente debe tenerlas en cuenta desde el
+  primer turno igual que el resto de reglas de esa sección. A diferencia de
+  este `CLAUDE.md` (que solo se lee cuando el directorio de trabajo es este
+  repo), el campo `instructions` es metadata del propio servidor MCP: lo
+  recibe automáticamente cualquier cliente (Claude u otro) que tenga este
+  MCP instalado, desde cualquier directorio, sin depender de este archivo.
+  Un cambio hecho con add/remove_personal_instruction se aplica desde el
+  próximo arranque del servidor MCP, no a mitad de la sesión actual — avisa
+  de eso si el usuario espera que valga ya mismo.
