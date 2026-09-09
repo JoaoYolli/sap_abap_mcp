@@ -114,6 +114,38 @@ reglas de esta sección: sigue avisando siempre del coste elevado del
 navegador frente a ADT, y sigue sin usarse control total del PC sin
 petición explícita.
 
+## Antes de crear un documento (pedido, expedición, entrega...): valida los datos primero
+
+Cuando el usuario pida crear en SAP algo que depende de datos maestros o de
+movimientos existentes (un pedido de venta, una expedición/entrega, una
+orden, etc.), no arranques la creación con datos supuestos o de memoria
+(un material cualquiera, un cliente cualquiera). Antes de tocar la
+transacción de creación (por ADT o por navegador), busca y confirma datos
+reales y válidos en el sistema para ese caso concreto:
+
+- Usa tools de lectura baratas (`read_table_data`, `describe_table_structure`,
+  `search_abap_objects`, o el propio ALV/reporte relevante) para encontrar,
+  por ejemplo, un material que sí tenga stock disponible en el almacén que
+  vas a usar, un cliente que sí esté habilitado para vender/entregar, un
+  centro/almacén válido para ese flujo, o un pedido/entrega existente si la
+  operación depende de uno.
+- El objetivo es no descubrir a mitad de la creación (dentro del dynpro o
+  del ALV, ya en el navegador) que el dato elegido no sirve — eso obliga a
+  salir, buscar, y volver a entrar, lo cual es mucho más caro en tokens que
+  una consulta de lectura hecha por adelantado.
+- Si la creación va a hacerse por navegador (porque no hay tool ADT para
+  ese documento), esta validación previa es aún más importante: cada
+  intento fallido dentro del ALV/dynpro cuesta capturas y rondas de
+  interpretación de pantalla completa, no solo una llamada estructurada.
+- Si tras la validación previa el dato igual resulta inválido ya dentro de
+  la transacción (SAP puede rechazar por reglas no visibles desde las
+  tablas de lectura), no lo tomes como fallo del paso de validación —
+  corrige con otro dato ya confirmado y sigue, en vez de volver a explorar
+  a ciegas.
+- Ver `project_sap_mcp_context` en memoria para la conexión y los objetos
+  de prueba ya autorizados en este sistema — si ya hay materiales/clientes
+  de prueba conocidos y válidos, empieza por ahí en vez de buscar de cero.
+
 ## Tablas de posiciones editables (ALV/table control clásico: VL01N, VA01...)
 
 Estas tablas (p. ej. "Todas las posiciones" en VL01N) NO son HTML normal:
