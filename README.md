@@ -378,6 +378,17 @@ Cubren cualquier tipo de objeto (`PROG`, `CLAS`, `FUGR`, `FUNC`, `INTF`,
 | `describe_table_structure` | Estructura DDIC de una tabla/estructura (campos, tipos, longitud, clave) vía RFC `DDIF_FIELDINFO_GET`. |
 | `run_abap_report` | Ejecuta un programa/report sin pantalla de selección y devuelve su salida. |
 
+### SAP GUI para HTML (WebGUI) en navegador
+
+Ver sección dedicada más abajo para el diseño completo. Último recurso frente
+a ADT — avisar siempre del coste en tokens antes de usarlas.
+
+| Tool | Descripción |
+|---|---|
+| `start_webgui_proxy` | Arranca el proxy local (o reutiliza uno ya activo para el mismo alias/puerto) y devuelve la URL para navegar. |
+| `get_webgui_proxy_status` | Comprueba si hay un proxy activo en un puerto y a qué alias está atado. |
+| `stop_webgui_proxy` | Detiene el proxy que esté escuchando en un puerto dado. |
+
 ### Checklist diario (agregador)
 
 | Tool | Descripción |
@@ -424,19 +435,42 @@ Chrome (claude-in-chrome) --> http://localhost:<puerto>/...   (esto es lo único
     --> https://<host-real>/...   (Authorization: Basic ... inyectado aquí)
 ```
 
-- **Arrancar**: `keeper/start-webgui.bat <alias> [puerto] [transaccion]` abre
-  una ventana de terminal nueva e independiente con `webgui-proxy.js` ya en
-  marcha (mismo patrón que `start-login.bat`: nunca se lanza desde dentro del
-  proceso del servidor MCP, que no tiene desktop propio). Puerto por defecto:
-  `4728`.
-- **Usar**: navegar a `http://localhost:<puerto>/` — redirige automáticamente
-  a WebGUI con el mandante ya puesto y, si se indicó, la transacción inicial
-  (`~transaction=`). El login es transparente (Basic Auth inyectado por el
-  proxy en cada petición), no aparece ninguna pantalla de logon.
-- **Rollback**: cerrar la ventana del proxy (o Ctrl+C), o ejecutar
-  `keeper/stop-webgui.bat [puerto]` si la ventana se cerró de forma sucia. El
-  proxy no escribe nada en disco ni deja perfil de navegador ni toca
-  `/etc/hosts` — pararlo deja el sistema exactamente como estaba antes.
+- **Arrancar**: tool `start_webgui_proxy` (`connection`, `port` opcional —
+  por defecto `4728` —, `transaction` opcional). A diferencia del login de
+  Keeper, esto sí puede hacerlo una tool del MCP directamente: el proxy no
+  necesita ninguna ventana ni interacción humana (es un servidor HTTP sin
+  pantalla), así que se lanza oculto (`spawn` con `windowsHide`, `detached` +
+  `unref`) y sigue vivo después de que termine la llamada a la tool. Si ya
+  hay un proxy activo en ese puerto para el mismo alias, la tool lo detecta
+  (vía `/__sapmcp_proxy_info`, ver debajo) y lo **reutiliza** en vez de
+  relanzarlo.
+- **Usar**: la tool devuelve la URL base (`http://localhost:<puerto>/`, que
+  redirige a WebGUI con el mandante ya puesto) y, si se indicó `transaction`,
+  la URL directa a esa pantalla. El login es transparente (Basic Auth
+  inyectado por el proxy en cada petición), no aparece ninguna pantalla de
+  logon.
+- **Cambiar de transacción sin reiniciar**: el proxy no sabe nada de
+  transacciones concretas, solo reenvía cualquier path/query al sistema real
+  con las credenciales ya inyectadas. Para moverse a otra pantalla dentro de
+  la misma sesión de trabajo basta con navegar la misma pestaña a
+  `http://localhost:<puerto>/sap/bc/gui/sap/its/webgui?sap-client=<mandante>&~transaction=<TCODE>`
+  — no hace falta (ni conviene) volver a llamar a `start_webgui_proxy`. El
+  argumento `transaction` de esa tool solo fija la pantalla del primer
+  redirect, no un límite posterior.
+- **Identificar el proxy ya abierto**: tool `get_webgui_proxy_status`
+  (`port` opcional), o directamente `GET
+  http://localhost:<puerto>/__sapmcp_proxy_info`, que devuelve `{ alias,
+  client, port }` (nunca host/usuario/contraseña) del alias con el que se
+  arrancó ese proceso concreto.
+- **Rollback**: tool `stop_webgui_proxy` (`port` opcional) — ya no hay
+  ninguna ventana visible que cerrar, el proceso se lanza oculto. El proxy no
+  escribe nada en disco ni deja perfil de navegador ni toca `/etc/hosts` —
+  pararlo deja el sistema exactamente como estaba antes.
+- **Scripts `.bat` (`keeper/start-webgui.bat` / `stop-webgui.bat`)**: quedan
+  como alternativa manual para el usuario (abren una ventana de terminal
+  visible con el proxy en marcha, útil para verlo/pararlo a mano fuera de
+  cualquier agente), pero un agente no debería usarlos — usa las tools de
+  arriba.
 - **Qué sí ve el agente**: únicamente `localhost:<puerto>` y las rutas/paths
   de WebGUI — nunca el host real, ni el usuario, ni la contraseña. El
   redirect de `/` y la reescritura de `Location` en los redirects del

@@ -48,6 +48,32 @@ una pantalla completa, en vez de una única llamada estructurada. Por eso:
   sobreentendido ni lo omitas aunque ya lo hayas avisado antes en la misma
   conversación.
 
+## Arrancar el proxy WebGUI: usa las tools, no el terminal
+
+El proxy de SAP GUI para HTML tiene sus propias tools del MCP —
+`start_webgui_proxy`, `get_webgui_proxy_status`, `stop_webgui_proxy`
+(`tools/webgui.js`) — así que llámalas como cualquier otra tool
+`mcp__sap-abap__*`, sin pasar por Bash/PowerShell ni por
+`start-webgui.bat`/`stop-webgui.bat` (esos `.bat` siguen existiendo solo como
+respaldo manual para el usuario, no como paso del agente). A diferencia del
+login de Keeper (sección anterior), esto SÍ puede hacerlo una tool MCP
+directamente: el proxy no necesita ninguna ventana ni interacción del
+usuario, así que no choca con la limitación de "esta tool no tiene desktop
+propio".
+
+- `start_webgui_proxy` es agnóstico a la transacción: una vez arrancado para
+  un alias, sirve cualquier ruta del sistema real detrás de él. Si ya hay un
+  proxy activo para el mismo alias en el mismo puerto, la propia tool lo
+  detecta y lo reutiliza — nunca la llames de nuevo solo para cambiar de
+  pantalla dentro de la misma sesión de trabajo. Para pasar a otra
+  transacción, navega (`navigate`) la misma pestaña a la URL que te devolvió
+  la tool cambiando `~transaction=<TCODE>`.
+- Si solo quieres saber si ya puedes navegar sin arrancar nada, usa antes
+  `get_webgui_proxy_status`.
+- Usa `stop_webgui_proxy` para el rollback en vez de pedirle al usuario que
+  cierre una ventana — ya no hay ninguna ventana visible que cerrar (el
+  proceso se lanza oculto).
+
 ## Automatización de navegador/PC: prioriza siempre la alternativa más barata en tokens
 
 Este repo incluye una feature de acceso a SAP GUI para HTML vía navegador

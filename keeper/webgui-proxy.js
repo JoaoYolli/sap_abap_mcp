@@ -45,6 +45,17 @@ async function main() {
       return;
     }
 
+    // Identificación del proxy ya en marcha: permite al agente comprobar a
+    // qué alias/mandante está atado ESTE proceso antes de decidir si lo
+    // reutiliza (navegando a otra transacción con la misma sesión) o si
+    // hace falta relanzarlo para un alias distinto. Nunca expone
+    // host/usuario/contraseña, solo el alias que se le pasó como argumento.
+    if (req.url === "/__sapmcp_proxy_info") {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ alias, client: conn.client, port: PORT }));
+      return;
+    }
+
     const headers = { ...req.headers };
     delete headers["host"];
     delete headers["origin"];
