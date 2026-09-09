@@ -220,32 +220,3 @@ cuenta. Investigado en sesión sobre VL01N en 2026-09:
   (observado: 1536×735 → 1522×784 → 1568×750 sin que el agente redimensione
   nada) — no reutilices coordenadas de píxeles de una captura antigua;
   recalcúlalas siempre a partir de la captura más reciente.
-
-## Instrucciones personales del usuario: gestiónalas con tools, no a mano
-
-Cualquier usuario de este MCP puede pedirte que le guardes instrucciones
-propias para que su agente las reciba automáticamente al arrancar cada
-sesión futura, sin tener que repetirlas en el chat cada vez (p. ej. "usa
-siempre la conexión de pruebas X salvo que diga lo contrario", "haz
-siempre tú el login de Keeper sin preguntar"). Estas instrucciones:
-
-- viven en `~/.sap-mcp/instructions.json` (carpeta del usuario del sistema
-  operativo activo — `os.homedir()` — no dentro de este repo), así que
-  sobreviven a un `git pull`, a una reinstalación o a un cambio de versión
-  del MCP, y son privadas de ese usuario/máquina: nunca se suben a git ni
-  se comparten entre usuarios.
-- se gestionan solo con las tools `add_personal_instruction`,
-  `list_personal_instructions` y `remove_personal_instruction`
-  (`tools/user-instructions.js` + `lib/user-instructions.js`) — nunca
-  edites ese JSON a mano ni con Bash/PowerShell, usa siempre las tools.
-- se inyectan automáticamente en las `instructions` del servidor MCP al
-  arrancar (`index.js` llama a `formatPersonalInstructionsBlock()`), junto
-  con una regla explícita de que el agente debe tenerlas en cuenta desde el
-  primer turno igual que el resto de reglas de esa sección. A diferencia de
-  este `CLAUDE.md` (que solo se lee cuando el directorio de trabajo es este
-  repo), el campo `instructions` es metadata del propio servidor MCP: lo
-  recibe automáticamente cualquier cliente (Claude u otro) que tenga este
-  MCP instalado, desde cualquier directorio, sin depender de este archivo.
-  Un cambio hecho con add/remove_personal_instruction se aplica desde el
-  próximo arranque del servidor MCP, no a mitad de la sesión actual — avisa
-  de eso si el usuario espera que valga ya mismo.
