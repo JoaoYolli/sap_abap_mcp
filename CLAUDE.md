@@ -146,6 +146,32 @@ reales y válidos en el sistema para ese caso concreto:
   de prueba ya autorizados en este sistema — si ya hay materiales/clientes
   de prueba conocidos y válidos, empieza por ahí en vez de buscar de cero.
 
+## Al rellenar pantallas en WebGUI: lee los mensajes y usa F4 antes de improvisar
+
+Cuando estés dentro de una transacción vía navegador (SAP GUI para HTML),
+no asumas que un Tab/Enter fue aceptado sin comprobarlo — SAP casi siempre
+lo dice en la propia pantalla, y leerlo ahí es mucho más barato que seguir
+adelante a ciegas y descubrir el problema varios pasos después:
+
+- **Mensajes de error/warning**: tras cada Tab/Enter/Guardar, revisa la
+  barra de mensajes (normalmente en la parte inferior de la pantalla, texto
+  rojo para error o amarillo para warning) con `get_page_text`/`read_page`
+  antes de seguir rellenando. Un error ahí casi siempre explica exactamente
+  qué campo o qué valor está mal — no lo ignores ni sigas adelante
+  asumiendo que "ya se arreglará".
+- **Campos obligatorios sin rellenar**: se marcan con un asterisco (`*`)
+  junto a la etiqueta o dentro del propio campo. Si SAP bloquea el avance
+  (no deja guardar, o vuelve a la misma pantalla), repasa primero si hay
+  algún `*` sin completar antes de sospechar de otra cosa.
+- **F4 (ayuda de valores)**: muchos campos aceptan F4 para desplegar una
+  lista de valores válidos ya filtrada al contexto actual (cliente,
+  material, centro... coherentes con lo que ya hay rellenado en la
+  pantalla). Si un dato que habías validado previamente (ver sección
+  anterior) resulta no servir ya dentro de la transacción, prueba F4 en ese
+  campo antes de salir a buscar otro dato por otra vía (tabla, ADT,
+  navegar a otra transacción) — normalmente es más rápido y ya viene
+  acotado al caso concreto, así que evita otra ronda de búsqueda aparte.
+
 ## Tablas de posiciones editables (ALV/table control clásico: VL01N, VA01...)
 
 Estas tablas (p. ej. "Todas las posiciones" en VL01N) NO son HTML normal:
@@ -194,3 +220,28 @@ cuenta. Investigado en sesión sobre VL01N en 2026-09:
   (observado: 1536×735 → 1522×784 → 1568×750 sin que el agente redimensione
   nada) — no reutilices coordenadas de píxeles de una captura antigua;
   recalcúlalas siempre a partir de la captura más reciente.
+
+## Instrucciones personales del usuario: gestiónalas con tools, no a mano
+
+Cualquier usuario de este MCP puede pedirte que le guardes instrucciones
+propias para que su agente las reciba automáticamente al arrancar cada
+sesión futura, sin tener que repetirlas en el chat cada vez (p. ej. "usa
+siempre la conexión de pruebas X salvo que diga lo contrario", "haz
+siempre tú el login de Keeper sin preguntar"). Estas instrucciones:
+
+- viven en `~/.sap-mcp/instructions.json` (carpeta del usuario del sistema
+  operativo activo — `os.homedir()` — no dentro de este repo), así que
+  sobreviven a un `git pull`, a una reinstalación o a un cambio de versión
+  del MCP, y son privadas de ese usuario/máquina: nunca se suben a git ni
+  se comparten entre usuarios.
+- se gestionan solo con las tools `add_personal_instruction`,
+  `list_personal_instructions` y `remove_personal_instruction`
+  (`tools/user-instructions.js` + `lib/user-instructions.js`) — nunca
+  edites ese JSON a mano ni con Bash/PowerShell, usa siempre las tools.
+- se inyectan automáticamente en las `instructions` del servidor MCP al
+  arrancar (`index.js` llama a `formatPersonalInstructionsBlock()`), así
+  que cualquier cliente (Claude u otro) las recibe desde el primer turno de
+  cada sesión nueva sin que el usuario tenga que pedirlo. Un cambio hecho
+  con add/remove_personal_instruction se aplica desde el próximo arranque
+  del servidor MCP, no a mitad de la sesión actual — avisa de eso si el
+  usuario espera que valga ya mismo.

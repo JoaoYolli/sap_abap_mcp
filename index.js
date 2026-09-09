@@ -16,6 +16,8 @@ import { registerReportTools } from "./tools/reports.js";
 import { registerDailyMonitoringTools } from "./tools/daily-monitoring.js";
 import { registerAtcTools } from "./tools/atc.js";
 import { registerWebguiTools } from "./tools/webgui.js";
+import { registerUserInstructionTools } from "./tools/user-instructions.js";
+import { formatPersonalInstructionsBlock } from "./lib/user-instructions.js";
 
 const server = new McpServer(
   {
@@ -54,6 +56,14 @@ Sigue este orden SIEMPRE, sin que el usuario tenga que pedirlo cada vez:
    defecto. Únicamente si el usuario lo pide explícitamente para ese caso
    concreto.
 
+Antes de crear en SAP cualquier documento que dependa de datos maestros o de
+movimientos existentes (pedido de venta, expedición/entrega, orden...), NO
+arranques con datos supuestos: busca primero (con tools de lectura baratas,
+p.ej. read_table_data/describe_table_structure) un material/cliente/almacén
+real y válido para ese caso (con stock, habilitado para vender, etc.).
+Descubrir a mitad de la creación que el dato no sirve es mucho más caro en
+tokens que una consulta previa, sobre todo si la creación es por navegador.
+
 Tablas de posiciones editables dentro de WebGUI (ALV/table control clásico,
 p.ej. "Todas las posiciones" en VL01N): si una celda no acepta texto (clic +
 escribir no deja nada), NO insistas con más clics/doble-clic/F2 -- casi
@@ -65,12 +75,19 @@ cabecera marcados con '*' y vuelve después. Una vez sin ese atributo, un
 solo clic + type + Tab por celda basta. Detalle completo (con snippet de
 diagnóstico) en CLAUDE.md.
 
+Dentro de cualquier pantalla de WebGUI: tras cada Tab/Enter/Guardar revisa
+la barra de mensajes (get_page_text/read_page) por si hay error o warning
+antes de seguir; repasa los campos marcados con '*' si SAP no deja avanzar;
+y si un dato ya no sirve dentro de la transacción, prueba F4 en ese campo
+(lista de valores ya filtrada al contexto actual) antes de salir a buscarlo
+por otra vía.
+
 Login de Keeper caducado/no iniciado: ejecuta tú mismo el comando de
 terminal que trae el error, en el mismo turno -- no se lo derives al
 usuario salvo que no tengas ninguna herramienta de terminal disponible.
 
 Detalle completo y razonamiento de cada punto en CLAUDE.md de este repo.
-`.trim(),
+${formatPersonalInstructionsBlock()}`.trim(),
   },
 );
 
@@ -89,6 +106,7 @@ registerReportTools(server);
 registerDailyMonitoringTools(server);
 registerAtcTools(server);
 registerWebguiTools(server);
+registerUserInstructionTools(server);
 
 async function main() {
   const transport = new StdioServerTransport();
