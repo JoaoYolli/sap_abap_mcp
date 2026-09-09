@@ -54,6 +54,17 @@ Sigue este orden SIEMPRE, sin que el usuario tenga que pedirlo cada vez:
    defecto. Únicamente si el usuario lo pide explícitamente para ese caso
    concreto.
 
+Tablas de posiciones editables dentro de WebGUI (ALV/table control clásico,
+p.ej. "Todas las posiciones" en VL01N): si una celda no acepta texto (clic +
+escribir no deja nada), NO insistas con más clics/doble-clic/F2 -- casi
+siempre es que falta un campo obligatorio (asterisco rojo) en la cabecera de
+esa misma pantalla, que bloquea toda la tabla con un atributo readonly hasta
+completarse. Comprueba con javascript_tool si el elemento activo tiene el
+atributo readonly/aria-readonly; si lo tiene, rellena primero los campos de
+cabecera marcados con '*' y vuelve después. Una vez sin ese atributo, un
+solo clic + type + Tab por celda basta. Detalle completo (con snippet de
+diagnóstico) en CLAUDE.md.
+
 Login de Keeper caducado/no iniciado: ejecuta tú mismo el comando de
 terminal que trae el error, en el mismo turno -- no se lo derives al
 usuario salvo que no tengas ninguna herramienta de terminal disponible.

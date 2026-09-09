@@ -113,3 +113,52 @@ defecto salvo petición explícita del usuario). Esto no cambia el resto de
 reglas de esta sección: sigue avisando siempre del coste elevado del
 navegador frente a ADT, y sigue sin usarse control total del PC sin
 petición explícita.
+
+## Tablas de posiciones editables (ALV/table control clásico: VL01N, VA01...)
+
+Estas tablas (p. ej. "Todas las posiciones" en VL01N) NO son HTML normal:
+cada celda es un `<span role="combobox">` del motor "Unified Rendering" de
+SAP GUI, con un atributo `readonly` que el framework quita o pone por su
+cuenta. Investigado en sesión sobre VL01N en 2026-09:
+
+- **Si una celda no acepta texto (clic + escribir no deja nada, y el valor
+  vuelve a quedar vacío al validar), NO es un bug de automatización — casi
+  siempre es que falta un campo obligatorio (asterisco rojo) en la
+  cabecera de la misma pantalla.** SAP bloquea toda la tabla de posiciones
+  hasta que esos campos estén completos (comprobado: en VL01N "sin
+  referencia a pedido", la tabla queda con `readonly` en todas las celdas
+  hasta rellenar "Dest.mercancías"; en cuanto se rellena ese campo, el
+  `readonly` desaparece solo y las celdas aceptan texto con normalidad).
+- **Diagnóstico barato antes de insistir con más clics**: usa
+  `javascript_tool` para inspeccionar la celda en la que hiciste clic:
+  ```js
+  const el = document.activeElement;
+  ({ tag: el.tagName, id: el.id, readonly: el.getAttribute('readonly'), ariaReadonly: el.getAttribute('aria-readonly') })
+  ```
+  Si `readonly` no es `null`, para de intentar clics/dobles-clics/F2 en esa
+  celda — ve a rellenar los campos obligatorios de cabecera (los marcados
+  con `*`) primero, y vuelve después. Esto cuesta una sola llamada y evita
+  una ronda larga de prueba y error.
+- **Receta una vez que la celda ya no es readonly**: un solo clic en la
+  celda + `type` con el valor + `Tab` — no hace falta doble-clic ni F2. Tab
+  mueve el foco a la siguiente celda de la fila. La descripción del
+  material, la unidad de medida y el tipo de posición se resuelven en un
+  round-trip del servidor que puede no completarse hasta el próximo Tab/
+  Enter que salga de la fila (p. ej. al volver a un campo de cabecera) —
+  si ves columnas derivadas vacías tras rellenar Material, es normal,
+  espera al siguiente round-trip en vez de asumir que falló.
+- **Ese round-trip puede reiniciar valores que tecleaste demasiado
+  pronto** (p. ej. una cantidad escrita justo antes de que la fila
+  termine de validarse puede volver a quedar vacía). Trátalo como
+  cualquier otro campo dynpro: rellena, espera (`wait` de 1-2s), y
+  verifica con una captura/zoom antes de seguir con el siguiente dato —
+  no encadenes muchos campos a ciegas en un solo lote.
+- Los popups de confirmación que a veces aparecen tras un Tab/Enter (p.
+  ej. "Programación de posición da como resultado fecha...") son parte de
+  la propia página (no diálogos nativos del navegador que bloqueen), así
+  que se pueden cerrar con normalidad haciendo clic en su botón
+  "Continuar".
+- El tamaño de viewport de la pestaña puede cambiar solo entre llamadas
+  (observado: 1536×735 → 1522×784 → 1568×750 sin que el agente redimensione
+  nada) — no reutilices coordenadas de píxeles de una captura antigua;
+  recalcúlalas siempre a partir de la captura más reciente.
