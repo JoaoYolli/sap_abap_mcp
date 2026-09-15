@@ -146,6 +146,61 @@ reales y válidos en el sistema para ese caso concreto:
   de prueba ya autorizados en este sistema — si ya hay materiales/clientes
   de prueba conocidos y válidos, empieza por ahí en vez de buscar de cero.
 
+## Registro de desarrollos SAP (vault Obsidian) — pide visto bueno antes de documentar
+
+Existe un vault de Obsidian fuera de este repo, en la carpeta home del
+usuario activo del sistema operativo (en Windows,
+`%USERPROFILE%\SAP-Dev-Log`), con el registro de desarrollos ABAP y reports
+ejecutados en los sistemas SAP gestionados desde este MCP — código escrito/
+modificado/activado, fixes, reports corridos con resultado relevante para
+el negocio. No es el historial de cambios de este repo (eso lo cubre git):
+documenta lo que se hizo **dentro de SAP**, con el sistema en el que se
+hizo siempre como dato obligatorio.
+
+- Estructura: `README.md` (punto de entrada, léelo primero si es la
+  primera vez que tocas el vault en la sesión), `Indice.md` (lista plana
+  cronológica), `_Plantillas/desarrollo.md` y `_Plantillas/reporte.md`
+  (front-matter y secciones ya listos para copiar), carpetas `Desarrollos/`,
+  `Reportes/` (una nota por `YYYY-MM-DD--slug.md`) y `Sistemas/` (una nota
+  por alias de conexión, con enlaces a cada desarrollo/reporte hecho ahí).
+  Front-matter de cada nota: `tipo`, `fecha`, `sistema` (alias de conexión
+  tal cual lo usa `list_connections` — **obligatorio**), `sid`, `objetos`,
+  `estado`, `tags`, `relacionado`. Detalle completo del esquema y de cómo
+  enlazar una nota nueva desde `Indice.md` y `Sistemas/` en el propio
+  `README.md` del vault.
+- **Regla fija, igual de estricta que la de Keeper**: nunca crees ni edites
+  una nota en este vault sin que el usuario haya dado el visto bueno
+  explícito **para ese desarrollo concreto**, justo antes. Al terminar un
+  desarrollo o report relevante, resume en el chat qué documentarías (tipo,
+  sistema, objetos tocados, resultado) y pregunta si lo registras — solo
+  escribe si la respuesta es afirmativa. Si el usuario ya pidió
+  explícitamente "documenta esto" para ese desarrollo concreto, eso cuenta
+  como visto bueno y no hace falta volver a preguntar.
+- Por qué esta regla: para que el registro quede limpio y refleje solo lo
+  que el usuario considera relevante, no un log automático de todo lo que
+  pasa por el MCP.
+
+## Paralelización con subagentes: despliega varios cuando ayude, eligiendo el modelo según la tarea
+
+Cuando una tarea se pueda dividir en subtareas independientes (o cuando
+distintas partes tengan necesidades de capacidad muy distintas), no la
+resuelvas siempre en serie con un único agente: despliega varios agentes en
+paralelo, uno por subtarea, y para cada uno elige el modelo más adecuado a
+su complejidad — uno más rápido/barato para subtareas simples o mecánicas,
+uno más capaz para las que requieran más razonamiento — en vez de usar el
+mismo modelo para todo por defecto.
+
+- Por qué: paraleliza el trabajo real (menos tiempo de punta a punta) y
+  evita gastar capacidad de un modelo caro en subtareas que uno más barato
+  resuelve igual de bien.
+- Cómo: usa la tool de despliegue de subagentes ya disponible en tu
+  cliente (en Claude Code, el tool Agent/Task con su parámetro de modelo),
+  sin que haga falta ninguna tool nueva de este MCP — es una práctica de
+  orquestación del propio agente, no una feature de `sap-mcp`.
+- No fuerces paralelismo en tareas que en realidad son secuenciales o
+  dependientes entre sí (p. ej. un paso necesita el resultado del
+  anterior) — la regla es paralelizar cuando ayude, no siempre.
+
 ## Al rellenar pantallas en WebGUI: lee los mensajes y usa F4 antes de improvisar
 
 Cuando estés dentro de una transacción vía navegador (SAP GUI para HTML),

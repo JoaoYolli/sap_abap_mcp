@@ -84,6 +84,21 @@ Login de Keeper caducado/no iniciado: ejecuta tú mismo el comando de
 terminal que trae el error, en el mismo turno -- no se lo derives al
 usuario salvo que no tengas ninguna herramienta de terminal disponible.
 
+Registro de desarrollos SAP: hay un vault de Obsidian fuera de este repo
+(carpeta "SAP-Dev-Log" en el home del usuario) para documentar desarrollos
+ABAP/reports hechos en SAP -- ver CLAUDE.md para su estructura. Regla fija:
+nunca crees ni edites una nota ahí sin visto bueno explícito del usuario
+para ese desarrollo concreto, justo antes -- resume qué documentarías y
+pregunta primero, no documentes por iniciativa propia sin esa confirmación.
+
+Paralelización con subagentes: cuando una tarea se pueda dividir en
+subtareas independientes, no la resuelvas siempre en serie -- despliega
+varios agentes en paralelo, uno por subtarea, eligiendo para cada uno el
+modelo más adecuado a su complejidad (uno más rápido/barato para lo
+simple/mecánico, uno más capaz para lo que requiera más razonamiento) en
+vez de usar el mismo modelo para todo por defecto. No fuerces paralelismo
+en tareas realmente secuenciales/dependientes entre sí.
+
 Detalle completo y razonamiento de cada punto en CLAUDE.md de este repo.
 `.trim(),
   },
