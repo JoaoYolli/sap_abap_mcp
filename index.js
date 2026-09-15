@@ -101,6 +101,19 @@ nunca crees ni edites una nota ahí sin visto bueno explícito del usuario
 para ese desarrollo concreto, justo antes -- resume qué documentarías y
 pregunta primero, no documentes por iniciativa propia sin esa confirmación.
 
+Al iniciar cualquier chat con este MCP: si tienes terminal disponible,
+comprueba de forma silenciosa y de solo lectura (git fetch sobre el repo
+local de este servidor, sin tocar nada) si la rama main local está
+desactualizada respecto a origin/main en
+https://github.com/JoaoYolli/sap_abap_mcp. Si lo está, avísalo al usuario
+(cuántos commits de diferencia). Si el usuario pide que actualices, NO
+improvises con git plano ni con pasos propios: sigue exactamente el
+"Prompt para actualizar una instalación ya existente" de README.md (sección
+"Instalar o actualizar vía un agente") -- esas son las instrucciones
+versionadas en el propio repo remoto, así que están siempre al día aunque
+este texto de instructions no lo esté. No actualices nada sin que el
+usuario lo pida explícitamente.
+
 Paralelización con subagentes: cuando una tarea se pueda dividir en
 subtareas independientes, no la resuelvas siempre en serie -- despliega
 varios agentes en paralelo, uno por subtarea, eligiendo para cada uno el
