@@ -4,6 +4,34 @@ Este repo es un servidor MCP (`sap-abap`) que expone tools sobre un sistema
 SAP. Las credenciales viven en Keeper Commander, nunca en el chat ni en
 archivos locales — ver `README.md` para el diseño completo.
 
+## Antes de escribir código: comprueba que existe y cómo se usa
+
+Antes de usar una función, clase, tipo o tabla de base de datos en código que
+vayas a escribir (ABAP o de este propio repo Node.js), no asumas su firma,
+sus parámetros, su estructura de campos ni su comportamiento de memoria —
+compruébalo primero:
+
+- **Funciones/clases/métodos ABAP**: usa `search_abap_objects` para
+  confirmar que existen (y con qué nombre exacto) y `read_abap_source` para
+  leer su interfaz real (parámetros, tipos, excepciones) antes de invocarlas
+  desde código nuevo. Si vas a modificar o extender algo ya usado en otro
+  sitio, revisa también `get_where_used` para no romper llamadas existentes.
+- **Tipos/estructuras ABAP (DDIC)**: usa `describe_table_structure` (sirve
+  tanto para tablas como para estructuras/tipos DDIC) para conocer los
+  campos reales, su tipo y su longitud antes de dar por buena una estructura
+  de memoria.
+- **Tablas de base de datos**: usa `describe_table_structure` para la
+  estructura y, si hace falta ver datos reales de ejemplo,
+  `read_table_data` — no asumas nombres de campo ni claves por analogía con
+  otras tablas similares.
+- **Código de este repo (JS/Node)**: usa `Grep`/`Glob`/`Read` sobre el
+  propio repo para confirmar que una función o clase ya existente hace lo
+  que crees antes de reutilizarla o extenderla.
+- Por qué: escribir a ciegas sobre una firma o estructura supuesta es
+  barato al principio pero cae en syntax-check/activate fallido o en un
+  bug silencioso más caro de depurar después — comprobarlo antes es una
+  sola llamada de lectura.
+
 ## Login de Keeper: ejecútalo tú, no se lo derives al usuario
 
 Cuando cualquier tool `mcp__sap-abap__*` falle porque la sesión de Keeper

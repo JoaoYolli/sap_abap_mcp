@@ -54,6 +54,16 @@ Sigue este orden SIEMPRE, sin que el usuario tenga que pedirlo cada vez:
    defecto. Únicamente si el usuario lo pide explícitamente para ese caso
    concreto.
 
+Antes de escribir código (ABAP o de otro tipo) que use una función, clase,
+método, tipo/estructura DDIC o tabla de base de datos: no asumas su firma,
+sus parámetros ni su estructura de campos -- compruébalo primero con
+search_abap_objects/read_abap_source (funciones/clases/métodos, y su
+interfaz real), get_where_used (si vas a tocar algo ya usado en otro sitio)
+y describe_table_structure/read_table_data (tipos, estructuras y tablas).
+Una llamada de lectura de más es mucho más barata que un syntax-check o
+activate fallido, o un bug silencioso por dar por buena una estructura
+supuesta.
+
 Antes de crear en SAP cualquier documento que dependa de datos maestros o de
 movimientos existentes (pedido de venta, expedición/entrega, orden...), NO
 arranques con datos supuestos: busca primero (con tools de lectura baratas,
